@@ -1,0 +1,8 @@
+# Python / Django artifacts
+**/__pycache__/
+*.pyc
+backend/db.sqlite3
+
+# Node / frontend artifacts
+frontend/my-project/node_modules/
+frontend/my-project/dist/

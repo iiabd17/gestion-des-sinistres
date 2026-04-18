@@ -1,0 +1,331 @@
+/* ─── Google Font ─────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ─── Full-screen wrapper ─────────────────────────────── */
+.lp-wrapper {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: #f0f2f5;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Card shell ────────────────────────────────────────── */
+/* We mimic the screenshot's "floating card" look */
+.lp-wrapper > .lp-left,
+.lp-wrapper > .lp-right {
+  height: 560px;
+}
+
+/* ─── Left dark panel ─────────────────────────────────── */
+.lp-left {
+  position: relative;
+  width: 380px;
+  min-width: 340px;
+  border-radius: 16px 0 0 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 36px 36px 28px;
+  /* dark building background */
+  background: #1a0a0a url('https://images.unsplash.com/photo-1486325212027-8081e485255e?w=800&q=80&fit=crop') center/cover no-repeat;
+  box-shadow: -4px 0 40px rgba(0,0,0,.18);
+}
+
+/* dark overlay so text is readable */
+.lp-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(10,2,2,.80) 0%, rgba(80,10,10,.65) 100%);
+  z-index: 0;
+}
+
+.lp-logo,
+.lp-hero,
+.lp-footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Logo */
+.lp-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lp-logo-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.lp-logo-text {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #fff;
+}
+
+/* Hero */
+.lp-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 20px;
+}
+
+.lp-hero-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.25;
+  margin: 0 0 18px;
+}
+
+.lp-hero-red {
+  display: block;
+  color: #E2000F;
+}
+
+.lp-hero-desc {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: rgba(255,255,255,.75);
+  margin: 0;
+  max-width: 300px;
+}
+
+/* Footer */
+.lp-footer {
+  font-size: 11.5px;
+  color: rgba(255,255,255,.45);
+  margin: 0;
+}
+
+/* ─── Right white panel ───────────────────────────────── */
+.lp-right {
+  width: 420px;
+  min-width: 360px;
+  background: #fff;
+  border-radius: 0 16px 16px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 4px 0 40px rgba(0,0,0,.10);
+}
+
+.lp-card {
+  width: 100%;
+  max-width: 360px;
+  padding: 0 36px;
+}
+
+/* ── Headings ─────────────────────────────────────────── */
+.lp-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #111;
+  margin: 0 0 8px;
+}
+
+.lp-subtitle {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 30px;
+  line-height: 1.5;
+}
+
+/* ── Form ─────────────────────────────────────────────── */
+.lp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lp-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #333;
+}
+
+.lp-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lp-forgot {
+  font-size: 12px;
+  font-weight: 500;
+  color: #E2000F;
+  text-decoration: none;
+  transition: opacity .2s;
+}
+
+.lp-forgot:hover { opacity: .75; }
+
+/* Input wrapper */
+.lp-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lp-icon {
+  position: absolute;
+  left: 13px;
+  width: 17px;
+  height: 17px;
+  color: #aaa;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.lp-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 42px 0 40px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fafafa;
+  font-size: 13.5px;
+  color: #222;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.lp-input::placeholder {
+  color: #bbb;
+}
+
+.lp-input:focus {
+  border-color: #E2000F;
+  box-shadow: 0 0 0 3px rgba(226,0,15,.10);
+  background: #fff;
+}
+
+/* Show/hide password eye button */
+.lp-eye {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  color: #aaa;
+  transition: color .2s;
+}
+
+.lp-eye:hover { color: #666; }
+
+.lp-eye svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ── Remember me ──────────────────────────────────────── */
+.lp-remember {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: #555;
+  user-select: none;
+  margin-top: -4px;
+}
+
+.lp-remember input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: #E2000F;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Submit button ────────────────────────────────────── */
+.lp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 48px;
+  width: 100%;
+  background: #E2000F;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: .4px;
+  transition: background .2s, transform .15s, box-shadow .2s;
+  box-shadow: 0 4px 16px rgba(226,0,15,.35);
+  margin-top: 4px;
+}
+
+.lp-btn:hover {
+  background: #c0000c;
+  box-shadow: 0 6px 20px rgba(226,0,15,.45);
+  transform: translateY(-1px);
+}
+
+.lp-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(226,0,15,.3);
+}
+
+.lp-arrow {
+  width: 18px;
+  height: 18px;
+  transition: transform .2s;
+}
+
+.lp-btn:hover .lp-arrow {
+  transform: translateX(4px);
+}
+
+/* ─── Responsive ──────────────────────────────────────── */
+@media (max-width: 780px) {
+  .lp-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    background: #fff;
+  }
+
+  .lp-left {
+    width: 100%;
+    min-width: unset;
+    height: 220px;
+    border-radius: 0 0 0 0;
+  }
+
+  .lp-right {
+    width: 100%;
+    min-width: unset;
+    height: auto;
+    border-radius: 0;
+    padding: 32px 0 48px;
+  }
+
+  .lp-wrapper > .lp-left,
+  .lp-wrapper > .lp-right {
+    height: auto;
+  }
+}
