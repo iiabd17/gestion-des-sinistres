@@ -109,9 +109,8 @@
 ══════════════════════════════════════════════════════ */
 
 .dcl-body {
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 0;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   overflow: hidden;
 }
@@ -133,12 +132,75 @@
   flex-wrap: wrap;
 }
 
-/* Filter tabs */
-.dcl-filter-tabs {
+/* Filter Grid */
+.dcl-filter-grid {
   display: flex;
-  gap: 6px;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fff;
+  padding: 10px 0;
+}
+
+.dcl-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dcl-filter-field label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #bbb;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  margin-left: 2px;
+}
+
+.dcl-filter-select, .dcl-filter-input {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
+  font-family: inherit;
+  outline: none;
+  transition: all .18s;
+  min-width: 120px;
+}
+
+.dcl-filter-select:focus, .dcl-filter-input:focus {
+  border-color: #E2000F;
+  box-shadow: 0 0 0 3px rgba(226,0,15,0.05);
+}
+
+.dcl-reset-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  background: #fcfcfc;
+  color: #999;
+  cursor: pointer;
+  transition: all .2s;
   flex-shrink: 0;
-  margin-top: 4px;
+}
+
+.dcl-reset-btn:hover {
+  background: #fff0f0;
+  color: #E2000F;
+  border-color: #ffdada;
+}
+
+.dcl-reset-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .dcl-ftab {

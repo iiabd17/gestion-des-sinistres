@@ -1,0 +1,301 @@
+/* ── Variables & Reset ──────────────────────────────── */
+.dg-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: #f8f9fc;
+  font-family: 'Inter', sans-serif;
+}
+
+.dg-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Topbar ─────────────────────────────────────────── */
+.dg-topbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 32px;
+  background: #fff;
+  border-bottom: 1px solid #edf2f7;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.dg-icon-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid #edf2f7;
+  background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #718096;
+}
+
+/* ── Content ────────────────────────────────────────── */
+.dg-content {
+  padding: 40px;
+  flex: 1;
+  overflow-y: auto;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Breadcrumbs */
+.dg-breadcrumbs {
+  font-size: 13px;
+  color: #a0aec0;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+}
+.dg-bc-sep { color: #cbd5e0; }
+.dg-bc-id { color: #4a5568; font-weight: 600; }
+
+/* Header */
+.dg-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.dg-title-group h1 {
+  font-size: 32px;
+  font-weight: 800;
+  color: #1a202c;
+  margin: 0 0 8px;
+}
+.dg-title-group p { font-size: 14px; color: #718096; margin: 0; }
+
+.dg-header-actions { display: flex; gap: 12px; }
+
+.dg-btn {
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; transition: all .2s;
+  border: 1px solid transparent;
+}
+.dg-btn-white { background: #fff; color: #4a5568; border-color: #e2e8f0; }
+.dg-btn-white:hover { border-color: #cbd5e0; background: #f7fafc; }
+
+.dg-btn-red { background: #E2000F; color: #fff; box-shadow: 0 4px 12px rgba(226, 0, 15, 0.2); }
+.dg-btn-red:hover { background: #c0000c; transform: translateY(-1px); }
+
+/* ── Grid ───────────────────────────────────────────── */
+.dg-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 32px;
+}
+
+.dg-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px;
+  border: 1px solid #edf2f7;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+
+.dg-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.dg-card-icon { color: #E2000F; }
+.dg-card-title { font-size: 18px; font-weight: 700; color: #2d3748; margin: 0; }
+
+/* Resume Section */
+.dg-info-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.dg-info-field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #a0aec0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.dg-info-val { font-size: 15px; font-weight: 600; color: #2d3748; }
+
+/* Stepper */
+.dg-stepper {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  padding-top: 10px;
+}
+
+.dg-step-connector {
+  position: absolute;
+  top: 24px;
+  left: 40px;
+  right: 40px;
+  height: 2px;
+  background: #edf2f7;
+  z-index: 1;
+}
+
+.dg-step-connector-progress {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  background: #E2000F;
+  transition: width .5s ease;
+}
+
+.dg-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  flex: 1;
+}
+
+.dg-step-point {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #edf2f7;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px;
+  color: #cbd5e0;
+  transition: all .3s;
+}
+
+.dg-step--completed .dg-step-point { background: #E2000F; border-color: #E2000F; color: #fff; }
+.dg-step--active .dg-step-point { background: #fff; border-color: #E2000F; color: #E2000F; box-shadow: 0 0 0 4px rgba(226,0,15,0.1); }
+.dg-step--locked .dg-step-point { background: #f7fafc; color: #cbd5e0; }
+
+.dg-step-label { font-size: 11px; font-weight: 700; color: #2d3748; text-transform: uppercase; margin-bottom: 4px; }
+.dg-step-date { font-size: 10px; color: #a0aec0; }
+
+/* Files Grid */
+.dg-pj-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+.dg-pj-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #edf2f7;
+  transition: all .2s;
+  cursor: pointer;
+}
+.dg-pj-card:hover { background: #fff; border-color: #e2e8f0; transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+
+.dg-pj-icon {
+  width: 44px; height: 44px;
+  background: #fff;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #E2000F; border: 1px solid #edf2f7;
+}
+
+.dg-pj-info { flex: 1; min-width: 0; }
+.dg-pj-name { display: block; font-size: 13px; font-weight: 700; color: #2d3748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dg-pj-meta { display: block; font-size: 10px; color: #a0aec0; margin-top: 2px; }
+
+.dg-pj-dl { color: #a0aec0; transition: color .2s; }
+.dg-pj-card:hover .dg-pj-dl { color: #E2000F; }
+
+/* ── Sidebar ────────────────────────────────────────── */
+.dg-sidebar { display: flex; flex-direction: column; gap: 24px; }
+
+.side-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid #edf2f7;
+}
+
+/* Financial Card */
+.dg-fin-title { font-size: 16px; font-weight: 700; color: #2d3748; margin-bottom: 24px; }
+
+.dg-fin-val-group { margin-bottom: 24px; }
+.dg-fin-label { font-size: 11px; color: #718096; margin-bottom: 4px; display: block; }
+.dg-fin-amount { font-size: 28px; font-weight: 800; color: #1a202c; }
+.dg-fin-currency { font-size: 14px; color: #a0aec0; margin-left: 4px; }
+
+.dg-progress-container { margin-bottom: 24px; }
+.dg-progress-bar { height: 8px; background: #edf2f7; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.dg-progress-fill { height: 100%; background: #E2000F; border-radius: 4px; }
+.dg-progress-text { font-size: 10px; font-weight: 700; color: #E2000F; text-align: right; display: block; }
+
+.dg-threshold-box {
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dg-threshold-info { display: flex; align-items: center; gap: 8px; color: #c53030; }
+.dg-threshold-val { font-size: 13px; font-weight: 700; color: #2d3748; }
+
+/* Routing Card */
+.dg-routing-card {
+  background: #E2000F;
+  background: linear-gradient(135deg, #E2000F 0%, #c0000c 100%);
+  border-radius: 20px;
+  padding: 24px;
+  color: #fff;
+}
+
+.dg-routing-head { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; opacity: 0.9; }
+.dg-routing-head svg { width: 20px; height: 20px; }
+.dg-routing-head span { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.dg-routing-status-box {
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.dg-rs-label { display: block; font-size: 10px; font-weight: 600; opacity: 0.7; margin-bottom: 6px; text-transform: uppercase; }
+.dg-rs-val { display: block; font-size: 15px; font-weight: 700; line-height: 1.4; }
+
+/* Bottom FAB */
+.dg-fab-archive {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  height: 52px;
+  padding: 0 28px;
+  background: #000;
+  color: #fff;
+  border-radius: 16px;
+  display: flex; align-items: center; gap: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  border: none;
+  transition: all .3s;
+  z-index: 100;
+}
+.dg-fab-archive:hover { background: #E2000F; transform: translateY(-3px); box-shadow: 0 15px 30px rgba(226,0,15,0.3); }
+.dg-fab-archive svg { width: 18px; height: 18px; }

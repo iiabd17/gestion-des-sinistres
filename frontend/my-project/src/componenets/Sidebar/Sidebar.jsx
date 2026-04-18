@@ -41,8 +41,17 @@ export default function Sidebar() {
 
       {/* Bottom nav */}
       <div className="sb-nav-bottom">
-        <button className="sb-nav-item"><IconSupport /><span>Support</span></button>
-        <button className="sb-nav-item"><IconSettings /><span>Paramètres</span></button>
+        <button className="sb-nav-item">
+          <IconSupport />
+          <span>Support</span>
+        </button>
+        <button 
+          className={`sb-nav-item ${pathname.startsWith('/settings') ? 'sb-nav-item--active' : ''}`}
+          onClick={() => navigate('/settings')}
+        >
+          <IconSettings />
+          <span>Paramètres</span>
+        </button>
       </div>
     </aside>
   )

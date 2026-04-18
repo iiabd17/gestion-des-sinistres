@@ -3,14 +3,72 @@ import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../componenets/Sidebar/Sidebar'
 import './NewDeclaration.css'
 
-const incidentTypes = [
-  'Panne d\'équipement',
-  'Coupure Fibre Optique',
-  'Surtension Électrique',
-  'Vandalisme de Site',
-  'Incendie',
-  'Inondation',
-  'Autre',
+const incidentCategories = [
+  {
+    nature: 'Fibre Optique',
+    types: [
+      { value: 'FIBRE_OPTIQUE', label: 'Fibre Optique' },
+    ]
+  },
+  {
+    nature: 'Acte de Sabotage',
+    types: [
+      { value: 'ACTE_DE_SABOTAGE', label: 'Acte de Sabotage' },
+    ]
+  },
+  {
+    nature: 'Vol',
+    types: [
+      { value: 'VOL', label: 'Vol' },
+      { value: 'VOL_PE', label: 'Vol + PE' },
+    ]
+  },
+  {
+    nature: 'Incendie',
+    types: [
+      { value: 'INCENDIE', label: 'Incendie' },
+      { value: 'INCENDIE_PE', label: 'Incendie + PE' },
+      { value: 'INCENDIE_SURTENSION_ELEC', label: 'Incendie Surtension Électrique' },
+    ]
+  },
+  {
+    nature: 'Intempérie',
+    types: [
+      { value: 'VENT_VIOLENT', label: 'Vent Violent' },
+      { value: 'FOUDRE', label: 'Foudre' },
+      { value: 'PLUIE', label: 'Pluie' },
+    ]
+  },
+  {
+    nature: 'Catastrophe Naturelle',
+    types: [
+      { value: 'TREMBLEMENT_DE_TERRE', label: 'Tremblement de Terre' },
+      { value: 'TEMPETE', label: 'Tempête' },
+      { value: 'INONDATION', label: 'Inondation' },
+      { value: 'GLISSEMENT_DE_TERRAIN', label: 'Glissement de Terrain' },
+      { value: 'DEGAT_DES_EAUX', label: 'Dégât des Eaux' },
+    ]
+  },
+  {
+    nature: 'Violence Politique',
+    types: [
+      { value: 'GREVES_EMEUTES', label: 'Grèves Émeutes' },
+      { value: 'MOUVEMENT_POPULAIRE', label: 'Mouvement Populaire' },
+      { value: 'AUTRES', label: 'Autres' },
+    ]
+  },
+  {
+    nature: 'RC',
+    types: [
+      { value: 'BRIS_DE_MACHINES', label: 'Bris de Machines' },
+      { value: 'BRIS_DE_GLACES', label: 'Bris de Glaces' },
+      { value: 'ACCIDENT_APPAREILS_ELEC', label: 'Accident aux Appareils Électriques' },
+      { value: 'RISQUES_INFORMATIQUES_ELEC', label: 'Risques Informatiques & Électroniques' },
+      { value: 'CHUTE_AERONEF_OBJET_SPATIAL', label: "Chute d'Aéronef ou Objet Spatial" },
+      { value: 'TRANSPORT_INTERNE', label: 'Transport Interne' },
+      { value: 'DOMMAGES', label: 'Dommages' },
+    ]
+  }
 ]
 
 export default function NewDeclaration() {
@@ -20,6 +78,7 @@ export default function NewDeclaration() {
   const [type, setType]        = useState('')
   const [date, setDate]        = useState('')
   const [time, setTime]        = useState('')
+  const [repairTime, setRepairTime] = useState('')
   const [code, setCode]        = useState('')
   const [desc, setDesc]        = useState('')
   const [address, setAddress]  = useState('')
@@ -95,7 +154,13 @@ export default function NewDeclaration() {
                       required
                     >
                       <option value="">Sélectionnez le type d'incident</option>
-                      {incidentTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                      {incidentCategories.map(cat => (
+                        <optgroup key={cat.nature} label={cat.nature}>
+                          {cat.types.map(t => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </optgroup>
+                      ))}
                     </select>
                     <svg className="nd-select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
@@ -108,7 +173,14 @@ export default function NewDeclaration() {
                   <div className="nd-row-2">
                     <div className="nd-field">
                       <label className="nd-field-label" htmlFor="nd-date">DATE DE CONSTATATION</label>
-                      <div className="nd-input-wrap">
+                      <div 
+                        className="nd-input-wrap"
+                        onClick={() => {
+                          const input = document.getElementById('nd-date');
+                          if (input && input.showPicker) input.showPicker();
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
                         <svg className="nd-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                         <input
                           id="nd-date"
@@ -116,12 +188,23 @@ export default function NewDeclaration() {
                           className="nd-input"
                           value={date}
                           onChange={e => setDate(e.target.value)}
+                          onClick={e => {
+                            if (e.target.showPicker) e.target.showPicker();
+                          }}
+                          style={{ cursor: 'pointer' }}
                         />
                       </div>
                     </div>
                     <div className="nd-field">
                       <label className="nd-field-label" htmlFor="nd-time">HEURE DE CONSTATATION</label>
-                      <div className="nd-input-wrap">
+                      <div 
+                        className="nd-input-wrap"
+                        onClick={() => {
+                          const input = document.getElementById('nd-time');
+                          if (input && input.showPicker) input.showPicker();
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
                         <svg className="nd-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                         <input
                           id="nd-time"
@@ -129,10 +212,41 @@ export default function NewDeclaration() {
                           className="nd-input"
                           value={time}
                           onChange={e => setTime(e.target.value)}
+                          onClick={e => {
+                            if (e.target.showPicker) e.target.showPicker();
+                          }}
+                          style={{ cursor: 'pointer' }}
                         />
                       </div>
                     </div>
                   </div>
+
+                  {type === 'FIBRE_OPTIQUE' && (
+                    <div className="nd-field nd-field--full" style={{ marginBottom: '1.25rem' }}>
+                      <label className="nd-field-label" htmlFor="nd-repair-time">HEURE DE RÉPARATION (Fibre Optique)</label>
+                      <div 
+                        className="nd-input-wrap"
+                        onClick={() => {
+                          const input = document.getElementById('nd-repair-time');
+                          if (input && input.showPicker) input.showPicker();
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <svg className="nd-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <input
+                          id="nd-repair-time"
+                          type="time"
+                          className="nd-input"
+                          value={repairTime}
+                          onChange={e => setRepairTime(e.target.value)}
+                          onClick={e => {
+                            if (e.target.showPicker) e.target.showPicker();
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="nd-field nd-field--full">
                     <label className="nd-field-label" htmlFor="nd-code">CODE DU SITE / LA STATION</label>
@@ -170,14 +284,24 @@ export default function NewDeclaration() {
                 <section className="nd-section-card">
                   <div className="nd-section-header">
                     <h2 className="nd-section-title">Localisation</h2>
-                    <button type="button" className="nd-geo-btn">
+                    <button 
+                      type="button" 
+                      className="nd-geo-btn"
+                      onClick={() => window.open('https://www.google.com/maps', '_blank')}
+                      title="Ouvrir Google Maps"
+                    >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                       GÉOLOCALISER
                     </button>
                   </div>
 
                   {/* Map placeholder */}
-                  <div className="nd-map">
+                  <div 
+                    className="nd-map" 
+                    onClick={() => window.open('https://www.google.com/maps', '_blank')}
+                    style={{ cursor: 'pointer' }}
+                    title="Ouvrir Google Maps"
+                  >
                     <div className="nd-map-bg" />
                     <div className="nd-map-pin">
                       <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -188,7 +312,18 @@ export default function NewDeclaration() {
                     </span>
                   </div>
 
-                  <label className="nd-field-label nd-field-label--sm" htmlFor="nd-address">ADRESSE OU POINT DE REPÈRE</label>
+                  <label 
+                    className="nd-field-label nd-field-label--sm" 
+                    htmlFor="nd-address"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open('https://www.google.com/maps', '_blank');
+                    }}
+                    style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                    title="Ouvrir Google Maps"
+                  >
+                    ADRESSE OU POINT DE REPÈRE (Ouvrir sur la carte)
+                  </label>
                   <div className="nd-input-wrap nd-input-wrap--mt">
                     <svg className="nd-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                     <input

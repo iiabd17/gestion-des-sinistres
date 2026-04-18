@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from '../../componenets/Sidebar/Sidebar'
 import './Declarations.css'
 
 /* ── Static data ─────────────────────────────────────── */
-const dossiersCompleter = [
+const defaultDossiersCompleter = [
   {
     id: '#D-2023-884', site: 'AL0452_Cheraga', ville: 'Alger Ouest',
     date: '12 Oct 2023', nature: 'Vol de CPbles', statut: 'EN ATTENTE',
@@ -27,7 +27,7 @@ const equipements = [
 
 const natureTabs = ['Tous', "Vol d'Équipements", 'Vandalisme']
 
-const dossiersValider = [
+const defaultDossiersValider = [
   { id: '#RZY-2023-6642', site: 'Algiers–Hydra', ville: 'Rué Coleé', date: '14 Oct 2023', nature: 'Incendie',            montant: '450,000.00', devise: 'DZD' },
   { id: '#RZY-2023-8911', site: 'Oran-Center',   ville: 'Repérant Officiø', date: '15 Oct 2023', nature: 'Dégâts des eaux',  montant: '120,500.00', devise: 'DZD' },
   { id: '#RZY-2023-1064', site: 'Constantine',    ville: 'Rue Salah Bi', date: '18 Oct 2023', nature: 'Vol Équipement',  montant: '890,000.00', devise: 'DZD' },
@@ -44,21 +44,84 @@ const natureColors = {
   'Batteries HB':    { bg: '#e0f2fe', color: '#0369a1' },
 }
 
+const WILAYAS = [
+  "01 Adrar", "02 Chlef", "03 Laghouat", "04 Oum El Bouaghi", "05 Batna", "06 Béjaïa", "07 Biskra", 
+  "08 Béchar", "09 Blida", "10 Bouira", "11 Tamanrasset", "12 Tébessa", "13 Tlemcen", "14 Tiaret", 
+  "15 Tizi Ouzou", "16 Alger", "17 Djelfa", "18 Jijel", "19 Sétif", "20 Saïda", "21 Skikda", 
+  "22 Sidi Bel Abbès", "23 Annaba", "24 Guelma", "25 Constantine", "26 Médéa", "27 Mostaganem", 
+  "28 M'Sila", "29 Mascara", "30 Ouargla", "31 Oran", "32 El Bayadh", "33 Illizi", 
+  "34 Bordj Bou Arreridj", "35 Boumerdès", "36 El Tarf", "37 Tindouf", "38 Tissemsilt", "39 El Oued", 
+  "40 Khenchela", "41 Souk Ahras", "42 Tipaza", "43 Mila", "44 Aïn Defla", "45 Naâma", 
+  "46 Aïn Témouchent", "47 Ghardaïa", "48 Relizane", "49 Timimoun", "50 Bordj Badji Mokhtar", 
+  "51 Ouled Djellal", "52 Béni Abbès", "53 In Salah", "54 In Guezzam", "55 Touggourt", "56 Djanet", 
+  "57 El M'Ghair", "58 El Meniaa", "59 Aflou", "60 Barika", "61 Ksar Chellala", "62 Messaad", 
+  "63 Aïn Oussera", "64 Boussaâda", "65 El Abiodh Sidi Cheikh", "66 El Kantara", "67 Bir El Ater", 
+  "68 Ksar El Boukhari", "69 El Aricha"
+];
+
+const STATUTS = ["Tous", "EN ATTENTE", "VALIDÉ", "REJETÉ"];
+const NATURE_OPTIONS = ["Tous", ...Object.keys(natureColors)];
+
 export default function Declarations() {
   const navigate = useNavigate()
-  const [tab, setTab]             = useState('completer')       // 'completer' | 'valider'
-  const [natureTab, setNatureTab] = useState('Tous')
-  const [selected, setSelected]   = useState(dossiersCompleter[0])
+  const location = useLocation()
+  
+  const [dossiersCompleter, setDossiersCompleter] = useState(() => {
+    const saved = localStorage.getItem('dossiersCompleter')
+    if (saved) return JSON.parse(saved)
+    localStorage.setItem('dossiersCompleter', JSON.stringify(defaultDossiersCompleter))
+    return defaultDossiersCompleter
+  })
+  
+  const [dossiersValider, setDossiersValider] = useState(() => {
+    const saved = localStorage.getItem('dossiersValider')
+    if (saved) return JSON.parse(saved)
+    localStorage.setItem('dossiersValider', JSON.stringify(defaultDossiersValider))
+    return defaultDossiersValider
+  })
+
+  // Start on 'completer' tab if location.state.tab === 'completer'
+  const [tab, setTab]             = useState(location.state?.tab || 'completer')
+  const [selected, setSelected]   = useState(dossiersCompleter[0] || null)
   const [page, setPage]           = useState(1)
 
-  /* filter by nature */
-  const filtered = natureTab === 'Tous'
-    ? dossiersCompleter
-    : dossiersCompleter.filter(d =>
-        natureTab === "Vol d'Équipements"
-          ? d.nature.toLowerCase().includes('vol')
-          : d.nature.toLowerCase().includes('vandalisme')
-      )
+  // Advanced Filters State
+  const [filterDate, setFilterDate] = useState('')
+  const [filterStatut, setFilterStatut] = useState('Tous')
+  const [filterNature, setFilterNature] = useState('Tous')
+  const [filterSite, setFilterSite] = useState('Tous')
+
+  /* filter logic */
+  const filtered = dossiersCompleter.filter(d => {
+    // Date filter (picker gives YYYY-MM-DD, d.date is "12 Oct 2023")
+    if (filterDate) {
+      const months = {
+        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+        'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+      };
+      const parts = d.date.split(' ');
+      if (parts.length === 3) {
+        const [day, mon, year] = parts;
+        const formattedDDate = `${year}-${months[mon]}-${day.padStart(2, '0')}`;
+        if (formattedDDate !== filterDate) return false;
+      }
+    }
+    
+    // Nature filter
+    if (filterNature !== 'Tous' && d.nature !== filterNature) return false;
+
+    // Statut filter
+    if (filterStatut !== 'Tous' && d.statut !== filterStatut) return false;
+
+    // Site filter (Wilaya)
+    if (filterSite !== 'Tous') {
+      const wilayaName = filterSite.split(' ').slice(1).join(' ').toLowerCase();
+      const match = d.site.toLowerCase().includes(wilayaName) || (d.ville && d.ville.toLowerCase().includes(wilayaName));
+      if (!match) return false;
+    }
+
+    return true;
+  });
 
   return (
     <div className="dcl-layout">
@@ -103,21 +166,75 @@ export default function Declarations() {
               {/* Left: table section */}
               <div className="dcl-table-col">
                 <div className="dcl-section-head">
-                  <div>
-                    <h1 className="dcl-title">Déclarations à Completer</h1>
-                    <p className="dcl-subtitle">6 dossiers nécessitent votre expertise technique</p>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div>
+                      <h1 className="dcl-title">Déclarations à Completer</h1>
+                      <p className="dcl-subtitle">6 dossiers nécessitent votre expertise technique</p>
+                    </div>
                   </div>
-                  {/* Nature filter tabs */}
-                  <div className="dcl-filter-tabs">
-                    {natureTabs.map(t => (
-                      <button
-                        key={t}
-                        className={`dcl-ftab ${natureTab === t ? 'dcl-ftab--active' : ''}`}
-                        onClick={() => setNatureTab(t)}
+                  {/* New Advanced Filters Grid */}
+                  <div className="dcl-filter-grid">
+                    <div className="dcl-filter-field">
+                      <label>DATE</label>
+                      <input 
+                        type="date" 
+                        className="dcl-filter-input"
+                        value={filterDate}
+                        onChange={(e) => setFilterDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="dcl-filter-field">
+                      <label>STATUT</label>
+                      <select 
+                        className="dcl-filter-select"
+                        value={filterStatut}
+                        onChange={(e) => setFilterStatut(e.target.value)}
                       >
-                        {t}
-                      </button>
-                    ))}
+                        {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="dcl-filter-field">
+                      <label>NATURE</label>
+                      <select 
+                        className="dcl-filter-select"
+                        value={filterNature}
+                        onChange={(e) => setFilterNature(e.target.value)}
+                      >
+                        {NATURE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </div>
+                    <div className="dcl-filter-field">
+                      <label>SITE (WILAYA)</label>
+                      <select 
+                        className="dcl-filter-select"
+                        value={filterSite}
+                        onChange={(e) => setFilterSite(e.target.value)}
+                      >
+                        <option value="Tous">Tous les sites</option>
+                        {WILAYAS.map(w => <option key={w} value={w}>{w}</option>)}
+                      </select>
+                    </div>
+                    
+                    <button 
+                      className="dcl-reset-btn"
+                      onClick={() => {
+                        setFilterDate('');
+                        setFilterStatut('Tous');
+                        setFilterNature('Tous');
+                        setFilterSite('Tous');
+                      }}
+                      title="Réinitialiser les filtres"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    </button>
+
+                    <button 
+                      className="dcl-panel-ajouter" 
+                      onClick={() => navigate('/declarations/new')}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      Ajouter
+                    </button>
                   </div>
                 </div>
 
@@ -157,7 +274,10 @@ export default function Declarations() {
                         <td>
                           <button
                             className="dcl-complete-btn"
-                            onClick={e => { e.stopPropagation(); setSelected(d) }}
+                            onClick={e => { 
+                              e.stopPropagation(); 
+                              navigate(`/declarations/completer/${d.id.replace('#', '')}`);
+                            }}
                           >
                             Compléter
                           </button>
@@ -167,70 +287,6 @@ export default function Declarations() {
                   </tbody>
                 </table>
               </div>
-
-              {/* Right: detail panel */}
-              {selected && (
-                <aside className="dcl-panel">
-                  <div className="dcl-panel-header">
-                    <div>
-                      <p className="dcl-panel-label">Approbation Dossier</p>
-                      <p className="dcl-panel-id">{selected.id}</p>
-                    </div>
-                    <button className="dcl-panel-ajouter">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      Ajouter
-                    </button>
-                  </div>
-
-                  {/* Équipements */}
-                  <div className="dcl-panel-section">
-                    <p className="dcl-panel-section-title">Équipements Sinistrés</p>
-                    <ul className="dcl-equip-list">
-                      {equipements.map((eq, i) => (
-                        <li key={i} className="dcl-equip-item">
-                          <span className="dcl-equip-dot" />
-                          <div>
-                            <p className="dcl-equip-name">{eq.label}</p>
-                            <p className="dcl-equip-qty">{eq.qty}</p>
-                          </div>
-                          <svg className="dcl-equip-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Estimation financière */}
-                  <div className="dcl-panel-section">
-                    <p className="dcl-panel-section-title">Estimation Financière (DZD)</p>
-                    <div className="dcl-estimation">
-                      <span className="dcl-estimation-currency">DA</span>
-                      <span className="dcl-estimation-value">1450000.00</span>
-                    </div>
-                    <p className="dcl-estimation-note">Basé sur les tarifs de remplacement Oct 2023</p>
-                  </div>
-
-                  {/* Photos */}
-                  <div className="dcl-panel-section">
-                    <p className="dcl-panel-section-title">Preuves Photographiques</p>
-                    <div className="dcl-photos">
-                      <div className="dcl-photo dcl-photo--1" />
-                      <div className="dcl-photo dcl-photo--2" />
-                      <div className="dcl-photo dcl-photo--empty">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CTA */}
-                  <button
-                    className="dcl-panel-cta"
-                    onClick={() => navigate('/declarations/new')}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    Compléter le dossier
-                  </button>
-                </aside>
-              )}
             </div>
           )}
 
@@ -300,7 +356,7 @@ export default function Declarations() {
                             aria-label="Voir le dossier"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/declarations/valider/${d.id}`);
+                              navigate(`/declarations/valider/${d.id.replace('#', '')}`);
                             }}
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>

@@ -1,0 +1,35 @@
+.dcd-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #fce7f3; /* very soft bg to match the dashboard aesthetic or white */
+  background: #fdfdfd;
+}
+
+.dcd-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.dcd-content {
+  flex: 1;
+  padding: 3rem 2rem;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* We reuse the panel from Declarations.css, but just make it center and wider */
+.dcd-container {
+  background: white;
+  width: 100%;
+  max-width: 900px;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  border: 1px solid #eee;
+}
