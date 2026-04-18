@@ -8,11 +8,36 @@ function Login() {
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // TODO: connect to backend auth
-    navigate('/dashboard')
+    setError('')
+    
+    try {
+      const response = await fetch('http://localhost:8000/api/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: email,  // Django SimpleJWT uses 'username' by default
+          password: password 
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Identifiants incorrects. Veuillez réessayer.')
+      }
+
+      const data = await response.json()
+      
+      // Save JWT tokens securely
+      localStorage.setItem('access_token', data.access)
+      localStorage.setItem('refresh_token', data.refresh)
+
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   return (
@@ -53,6 +78,12 @@ function Login() {
           <p className="lp-subtitle">
             Veuillez saisir vos identifiants pour accéder à votre compte .
           </p>
+
+          {error && (
+            <div style={{ color: '#E2000F', backgroundColor: '#ffe6e6', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '0.9rem', fontWeight: '500' }}>
+              {error}
+            </div>
+          )}
 
           <form className="lp-form" onSubmit={handleSubmit} noValidate>
 
