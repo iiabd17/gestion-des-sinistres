@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import Sidebar from '../../componenets/Sidebar/Sidebar'
+import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './Declarations.css'
 
 /* ── Static data ─────────────────────────────────────── */
@@ -28,34 +28,34 @@ const equipements = [
 const natureTabs = ['Tous', "Vol d'Équipements", 'Vandalisme']
 
 const defaultDossiersValider = [
-  { id: '#RZY-2023-6642', site: 'Algiers–Hydra', ville: 'Rué Coleé', date: '14 Oct 2023', nature: 'Incendie',            montant: '450,000.00', devise: 'DZD' },
-  { id: '#RZY-2023-8911', site: 'Oran-Center',   ville: 'Repérant Officiø', date: '15 Oct 2023', nature: 'Dégâts des eaux',  montant: '120,500.00', devise: 'DZD' },
-  { id: '#RZY-2023-1064', site: 'Constantine',    ville: 'Rue Salah Bi', date: '18 Oct 2023', nature: 'Vol Équipement',  montant: '890,000.00', devise: 'DZD' },
-  { id: '#RZY-2023-1122', site: 'Setif–Industrial', ville: 'Storage Ltd', date: '20 Oct 2023', nature: 'Accident',           montant: '65,000.00',  devise: 'DZD' },
+  { id: '#RZY-2023-6642', site: 'Algiers–Hydra', ville: 'Rué Coleé', date: '14 Oct 2023', nature: 'Incendie', montant: '450,000.00', devise: 'DZD' },
+  { id: '#RZY-2023-8911', site: 'Oran-Center', ville: 'Repérant Officiø', date: '15 Oct 2023', nature: 'Dégâts des eaux', montant: '120,500.00', devise: 'DZD' },
+  { id: '#RZY-2023-1064', site: 'Constantine', ville: 'Rue Salah Bi', date: '18 Oct 2023', nature: 'Vol Équipement', montant: '890,000.00', devise: 'DZD' },
+  { id: '#RZY-2023-1122', site: 'Setif–Industrial', ville: 'Storage Ltd', date: '20 Oct 2023', nature: 'Accident', montant: '65,000.00', devise: 'DZD' },
 ]
 
 const natureColors = {
-  'Incendie':        { bg: '#fef9c3', color: '#a16207' },
+  'Incendie': { bg: '#fef9c3', color: '#a16207' },
   'Dégâts des eaux': { bg: '#dbeafe', color: '#1d4ed8' },
-  'Vol Équipement':  { bg: '#ede9fe', color: '#7c3aed' },
-  'Accident':        { bg: '#d1fae5', color: '#065f46' },
-  "Vol de CPbles":   { bg: '#fee2e2', color: '#b91c1c' },
-  'Vandalisme BTS':  { bg: '#fce7f3', color: '#be185d' },
-  'Batteries HB':    { bg: '#e0f2fe', color: '#0369a1' },
+  'Vol Équipement': { bg: '#ede9fe', color: '#7c3aed' },
+  'Accident': { bg: '#d1fae5', color: '#065f46' },
+  "Vol de CPbles": { bg: '#fee2e2', color: '#b91c1c' },
+  'Vandalisme BTS': { bg: '#fce7f3', color: '#be185d' },
+  'Batteries HB': { bg: '#e0f2fe', color: '#0369a1' },
 }
 
 const WILAYAS = [
-  "01 Adrar", "02 Chlef", "03 Laghouat", "04 Oum El Bouaghi", "05 Batna", "06 Béjaïa", "07 Biskra", 
-  "08 Béchar", "09 Blida", "10 Bouira", "11 Tamanrasset", "12 Tébessa", "13 Tlemcen", "14 Tiaret", 
-  "15 Tizi Ouzou", "16 Alger", "17 Djelfa", "18 Jijel", "19 Sétif", "20 Saïda", "21 Skikda", 
-  "22 Sidi Bel Abbès", "23 Annaba", "24 Guelma", "25 Constantine", "26 Médéa", "27 Mostaganem", 
-  "28 M'Sila", "29 Mascara", "30 Ouargla", "31 Oran", "32 El Bayadh", "33 Illizi", 
-  "34 Bordj Bou Arreridj", "35 Boumerdès", "36 El Tarf", "37 Tindouf", "38 Tissemsilt", "39 El Oued", 
-  "40 Khenchela", "41 Souk Ahras", "42 Tipaza", "43 Mila", "44 Aïn Defla", "45 Naâma", 
-  "46 Aïn Témouchent", "47 Ghardaïa", "48 Relizane", "49 Timimoun", "50 Bordj Badji Mokhtar", 
-  "51 Ouled Djellal", "52 Béni Abbès", "53 In Salah", "54 In Guezzam", "55 Touggourt", "56 Djanet", 
-  "57 El M'Ghair", "58 El Meniaa", "59 Aflou", "60 Barika", "61 Ksar Chellala", "62 Messaad", 
-  "63 Aïn Oussera", "64 Boussaâda", "65 El Abiodh Sidi Cheikh", "66 El Kantara", "67 Bir El Ater", 
+  "01 Adrar", "02 Chlef", "03 Laghouat", "04 Oum El Bouaghi", "05 Batna", "06 Béjaïa", "07 Biskra",
+  "08 Béchar", "09 Blida", "10 Bouira", "11 Tamanrasset", "12 Tébessa", "13 Tlemcen", "14 Tiaret",
+  "15 Tizi Ouzou", "16 Alger", "17 Djelfa", "18 Jijel", "19 Sétif", "20 Saïda", "21 Skikda",
+  "22 Sidi Bel Abbès", "23 Annaba", "24 Guelma", "25 Constantine", "26 Médéa", "27 Mostaganem",
+  "28 M'Sila", "29 Mascara", "30 Ouargla", "31 Oran", "32 El Bayadh", "33 Illizi",
+  "34 Bordj Bou Arreridj", "35 Boumerdès", "36 El Tarf", "37 Tindouf", "38 Tissemsilt", "39 El Oued",
+  "40 Khenchela", "41 Souk Ahras", "42 Tipaza", "43 Mila", "44 Aïn Defla", "45 Naâma",
+  "46 Aïn Témouchent", "47 Ghardaïa", "48 Relizane", "49 Timimoun", "50 Bordj Badji Mokhtar",
+  "51 Ouled Djellal", "52 Béni Abbès", "53 In Salah", "54 In Guezzam", "55 Touggourt", "56 Djanet",
+  "57 El M'Ghair", "58 El Meniaa", "59 Aflou", "60 Barika", "61 Ksar Chellala", "62 Messaad",
+  "63 Aïn Oussera", "64 Boussaâda", "65 El Abiodh Sidi Cheikh", "66 El Kantara", "67 Bir El Ater",
   "68 Ksar El Boukhari", "69 El Aricha"
 ];
 
@@ -65,14 +65,14 @@ const NATURE_OPTIONS = ["Tous", ...Object.keys(natureColors)];
 export default function Declarations() {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   const [dossiersCompleter, setDossiersCompleter] = useState(() => {
     const saved = localStorage.getItem('dossiersCompleter')
     if (saved) return JSON.parse(saved)
     localStorage.setItem('dossiersCompleter', JSON.stringify(defaultDossiersCompleter))
     return defaultDossiersCompleter
   })
-  
+
   const [dossiersValider, setDossiersValider] = useState(() => {
     const saved = localStorage.getItem('dossiersValider')
     if (saved) return JSON.parse(saved)
@@ -81,9 +81,9 @@ export default function Declarations() {
   })
 
   // Start on 'completer' tab if location.state.tab === 'completer'
-  const [tab, setTab]             = useState(location.state?.tab || 'completer')
-  const [selected, setSelected]   = useState(dossiersCompleter[0] || null)
-  const [page, setPage]           = useState(1)
+  const [tab, setTab] = useState(location.state?.tab || 'completer')
+  const [selected, setSelected] = useState(dossiersCompleter[0] || null)
+  const [page, setPage] = useState(1)
 
   // Advanced Filters State
   const [filterDate, setFilterDate] = useState('')
@@ -93,21 +93,7 @@ export default function Declarations() {
 
   /* filter logic */
   const filtered = dossiersCompleter.filter(d => {
-    // Date filter (picker gives YYYY-MM-DD, d.date is "12 Oct 2023")
-    if (filterDate) {
-      const months = {
-        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
-        'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-      };
-      const parts = d.date.split(' ');
-      if (parts.length === 3) {
-        const [day, mon, year] = parts;
-        const formattedDDate = `${year}-${months[mon]}-${day.padStart(2, '0')}`;
-        if (formattedDDate !== filterDate) return false;
-      }
-    }
-    
-    // Nature filter
+    // Nature pill filter (we can re-use filterNature state)
     if (filterNature !== 'Tous' && d.nature !== filterNature) return false;
 
     // Statut filter
@@ -162,40 +148,32 @@ export default function Declarations() {
               TAB 1 – À COMPLETER
           ══════════════════════════════════════════ */}
           {tab === 'completer' && (
-            <div className="dcl-body">
+            <div className="dcl-body" style={{ flexDirection: 'row' }}>
               {/* Left: table section */}
-              <div className="dcl-table-col">
-                <div className="dcl-section-head">
+              <div className="dcl-table-col" style={{ flex: 1 }}>
+                <div className="dcl-section-head" style={{ marginBottom: 20 }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <div>
                       <h1 className="dcl-title">Déclarations à Completer</h1>
                       <p className="dcl-subtitle">6 dossiers nécessitent votre expertise technique</p>
                     </div>
                   </div>
-                  {/* New Advanced Filters Grid */}
+
+                  {/* Advanced Filters Grid */}
                   <div className="dcl-filter-grid">
                     <div className="dcl-filter-field">
                       <label>DATE</label>
-                      <input 
-                        type="date" 
+                      <input
+                        type="date"
                         className="dcl-filter-input"
                         value={filterDate}
                         onChange={(e) => setFilterDate(e.target.value)}
                       />
                     </div>
-                    <div className="dcl-filter-field">
-                      <label>STATUT</label>
-                      <select 
-                        className="dcl-filter-select"
-                        value={filterStatut}
-                        onChange={(e) => setFilterStatut(e.target.value)}
-                      >
-                        {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
+
                     <div className="dcl-filter-field">
                       <label>NATURE</label>
-                      <select 
+                      <select
                         className="dcl-filter-select"
                         value={filterNature}
                         onChange={(e) => setFilterNature(e.target.value)}
@@ -205,7 +183,7 @@ export default function Declarations() {
                     </div>
                     <div className="dcl-filter-field">
                       <label>SITE (WILAYA)</label>
-                      <select 
+                      <select
                         className="dcl-filter-select"
                         value={filterSite}
                         onChange={(e) => setFilterSite(e.target.value)}
@@ -214,8 +192,8 @@ export default function Declarations() {
                         {WILAYAS.map(w => <option key={w} value={w}>{w}</option>)}
                       </select>
                     </div>
-                    
-                    <button 
+
+                    <button
                       className="dcl-reset-btn"
                       onClick={() => {
                         setFilterDate('');
@@ -225,15 +203,7 @@ export default function Declarations() {
                       }}
                       title="Réinitialiser les filtres"
                     >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                    </button>
-
-                    <button 
-                      className="dcl-panel-ajouter" 
-                      onClick={() => navigate('/declarations/new')}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      Ajouter
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
                     </button>
                   </div>
                 </div>
@@ -250,7 +220,7 @@ export default function Declarations() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(d => (
+                    {filtered.map((d, i) => (
                       <tr
                         key={d.id}
                         className={selected?.id === d.id ? 'dcl-row--selected' : ''}
@@ -269,17 +239,22 @@ export default function Declarations() {
                           </span>
                         </td>
                         <td>
-                          <span className="dcl-badge-attente">EN ATTENTE</span>
+                          <span className="dcl-badge-attente">
+                            {/* Dot icon simulated */}
+                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#d97706', display: 'inline-block', marginRight: 4 }} />
+                            EN ATTENTE
+                          </span>
                         </td>
                         <td>
                           <button
                             className="dcl-complete-btn"
-                            onClick={e => { 
-                              e.stopPropagation(); 
+                            style={{ background: '#fce7f3', color: '#be185d', boxShadow: 'none' }}
+                            onClick={e => {
+                              e.stopPropagation();
                               navigate(`/declarations/completer/${d.id.replace('#', '')}`);
                             }}
                           >
-                            Compléter
+                            Completer
                           </button>
                         </td>
                       </tr>
@@ -287,6 +262,8 @@ export default function Declarations() {
                   </tbody>
                 </table>
               </div>
+
+
             </div>
           )}
 
@@ -359,7 +336,7 @@ export default function Declarations() {
                               navigate(`/declarations/valider/${d.id.replace('#', '')}`);
                             }}
                           >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                           </button>
                         </td>
                       </tr>
@@ -372,7 +349,7 @@ export default function Declarations() {
                   <span className="dcl-page-info">Affichage de 1-4 sur 24 dossiers</span>
                   <div className="dcl-pages">
                     <button className="dcl-page-btn" disabled>‹</button>
-                    {[1,2,3].map(p => (
+                    {[1, 2, 3].map(p => (
                       <button
                         key={p}
                         className={`dcl-page-btn ${page === p ? 'dcl-page-btn--active' : ''}`}
@@ -395,8 +372,8 @@ export default function Declarations() {
 
 /* ── Icons ───────────────────────────────────────────── */
 function IconBell() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
 }
 function IconUser() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
 }

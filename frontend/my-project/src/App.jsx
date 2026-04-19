@@ -1,30 +1,30 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Login from './Pages/authentification/Login'
-import Dashboard from './Pages/Dashboard/Dashboard'
-import NewDeclaration from './Pages/Declaration/NewDeclaration'
-import Declarations from './Pages/Declarations/Declarations'
-import DossierValidation from './Pages/Declarations/DossierValidation'
-import DossierCompleterDetail from './Pages/Declarations/DossierCompleterDetail'
-import GestionDossiers from './Pages/GestionDossiers/GestionDossiers'
-import DossierGestionDetail from './Pages/GestionDossiers/DossierGestionDetail'
-import Archives from './Pages/Archives/Archives'
-import Settings from './Pages/Settings/Settings'
+import LoginPage from './Pages/authentification/LoginPage'
+import DashboardPage from './Pages/Dashboard/DashboardPage'
+import NewDeclarationPage from './Pages/Declaration/NewDeclarationPage'
+import DeclarationsPage from './Pages/Declarations/DeclarationsPage'
+import DossierValidationPage from './Pages/Declarations/DossierValidationPage'
+import DossierCompleterDetailPage from './Pages/Declarations/DossierCompleterDetailPage'
+import GestionDossiersPage from './Pages/GestionDossiers/GestionDossiersPage'
+import DossierGestionDetailPage from './Pages/GestionDossiers/DossierGestionDetailPage'
+import ArchivesPage from './Pages/Archives/ArchivesPage'
+import SettingsPage from './Pages/Settings/SettingsPage'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/declarations" element={<Declarations />} />
-        <Route path="/declarations/new" element={<NewDeclaration />} />
-        <Route path="/declarations/completer/:id" element={<DossierCompleterDetail />} />
-        <Route path="/declarations/valider/:id" element={<DossierValidation />} />
-        <Route path="/gestion" element={<GestionDossiers />} />
-        <Route path="/gestion/:id" element={<DossierGestionDetail />} />
-        <Route path="/archives" element={<Archives />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/declarations" element={<DeclarationsPage />} />
+        <Route path="/declarations/new" element={<NewDeclarationPage />} />
+        <Route path="/declarations/completer/:id" element={<DossierCompleterDetailPage />} />
+        <Route path="/declarations/valider/:id" element={<DossierValidationPage />} />
+        <Route path="/gestion" element={<GestionDossiersPage />} />
+        <Route path="/gestion/:id" element={<DossierGestionDetailPage />} />
+        <Route path="/archives" element={<ArchivesPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </BrowserRouter>
   )

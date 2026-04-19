@@ -109,10 +109,10 @@
 
 /* Filters Card */
 .gd-filters-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px 20px;
-  border: 1px solid #edf2f7;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 18px 24px;
+  border: none;
   display: flex;
   gap: 20px;
   align-items: flex-end;
@@ -137,11 +137,11 @@
 .gd-select, .gd-date-input {
   width: 100%;
   height: 42px;
-  padding: 0 12px;
+  padding: 0 14px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  font-size: 14px;
+  background: #fff;
+  font-size: 13.5px;
   color: #2d3748;
   outline: none;
   transition: all .2s;
@@ -159,8 +159,9 @@
 .gd-table-card {
   background: #fff;
   border-radius: 12px;
-  border: 1px solid #edf2f7;
+  border: none;
   overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
 }
 
 .gd-table {
@@ -170,9 +171,9 @@
 
 .gd-table th {
   text-align: left;
-  padding: 16px 20px;
-  background: #f7fafc;
-  font-size: 11px;
+  padding: 18px 20px;
+  background: #fff;
+  font-size: 10px;
   font-weight: 700;
   color: #718096;
   text-transform: uppercase;
@@ -202,7 +203,7 @@
   align-items: flex-start;
   gap: 10px;
 }
-.gd-site-cell svg { margin-top: 4px; color: #a0aec0; }
+.gd-site-cell svg { margin-top: 2px; color: #a0aec0; width: 18px; height: 18px; flex-shrink: 0; }
 .gd-site-name { display: block; font-weight: 600; color: #2d3748; }
 
 .gd-type-badge {
@@ -216,7 +217,7 @@
   font-weight: 600;
   color: #475569;
 }
-.gd-type-badge svg { color: #94a3b8; }
+.gd-type-badge svg { color: #94a3b8; width: 16px; height: 16px; flex-shrink: 0; }
 
 /* Status Badges */
 .gd-status-badge {

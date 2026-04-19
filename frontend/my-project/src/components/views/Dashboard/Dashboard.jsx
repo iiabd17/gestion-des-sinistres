@@ -1,6 +1,6 @@
 
-import { useNavigate } from 'react-router-dom'
-import Sidebar from '../../componenets/Sidebar/Sidebar'
+import { useNavigate, Link } from 'react-router-dom'
+import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './Dashboard.css'
 
 /* ── static data ─────────────────────────────────────── */
@@ -100,13 +100,6 @@ export default function Dashboard() {
             <div className="db-stat-card">
               <span className="db-stat-label">EN ATTENTE DE VALIDATION</span>
               <span className="db-stat-value db-stat-value--sm">24</span>
-              <div className="db-progress-row">
-                <span className="db-progress-label">Vitesse de traitement</span>
-                <span className="db-progress-pct">84%</span>
-              </div>
-              <div className="db-progress-track">
-                <div className="db-progress-bar" style={{ width: '84%' }} />
-              </div>
             </div>
           </div>
 
@@ -117,7 +110,7 @@ export default function Dashboard() {
             <section className="db-table-section">
               <div className="db-section-header">
                 <h2 className="db-section-title">Sinistres Récents</h2>
-                <a href="#" className="db-voir-tout">Voir toute l'activité →</a>
+                <Link to="/gestion" className="db-voir-tout">Voir toute l'activité →</Link>
               </div>
               <table className="db-table">
                 <thead>

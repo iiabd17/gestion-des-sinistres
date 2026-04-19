@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import Sidebar from '../../componenets/Sidebar/Sidebar'
+import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './DossierValidation.css'
 
 /* ── Mock data (keyed by dossier id) ─────────────────── */
@@ -65,38 +65,38 @@ const natureStyle = {
   'Accident':         { bg: '#d1fae5', color: '#065f46' },
 }
 
-export default function DossierValidation() {
+export default function DossierCompleterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
 
   /* Normalise the id - URL uses the raw id like RZY-2023-6642 */
   const data = dossiers[id] || dossiers['RZY-2023-6642']
   const ns   = natureStyle[data.nature] || { bg: '#f0f0f0', color: '#555' }
-
-  const handleInfoManquante = () => {
+  const handleCompleterDossier = () => {
     try {
-      const savedValider = JSON.parse(localStorage.getItem('dossiersValider') || '[]');
       const savedCompleter = JSON.parse(localStorage.getItem('dossiersCompleter') || '[]');
+      const savedValider = JSON.parse(localStorage.getItem('dossiersValider') || '[]');
       
-      const dossierIndex = savedValider.findIndex(d => d.id.includes(id));
+      const dossierIndex = savedCompleter.findIndex(d => d.id === id || d.id === '#' + id);
       if (dossierIndex !== -1) {
-        const movedDossier = savedValider.splice(dossierIndex, 1)[0];
-        savedCompleter.unshift({
+        const movedDossier = savedCompleter.splice(dossierIndex, 1)[0];
+        savedValider.unshift({
           id: movedDossier.id,
           site: movedDossier.site,
           ville: movedDossier.ville || 'À préciser',
           date: movedDossier.date,
           nature: movedDossier.nature,
-          statut: 'EN ATTENTE'
+          montant: '1,450,000.00',
+          devise: 'DZD'
         });
         
-        localStorage.setItem('dossiersValider', JSON.stringify(savedValider));
         localStorage.setItem('dossiersCompleter', JSON.stringify(savedCompleter));
+        localStorage.setItem('dossiersValider', JSON.stringify(savedValider));
       }
     } catch (e) {
       console.error(e);
     }
-    navigate('/declarations', { state: { tab: 'completer' } });
+    navigate('/declarations', { state: { tab: 'valider' } });
   }
 
   return (
@@ -123,12 +123,12 @@ export default function DossierValidation() {
             <div className="dv-page-meta">
               <span className="dv-eyebrow">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                DOSSIER EN RÉVISION
+                DOSSIER EN ATTENTE
               </span>
               <span className="dv-eyebrow-id">#{id || 'RZY-2023-0842'}</span>
             </div>
             <div className="dv-header-row">
-              <h1 className="dv-title">Validation du Dossier</h1>
+              <h1 className="dv-title">Dossier à Compléter</h1>
               <div className="dv-chips">
                 <div className="dv-chip">
                   <span className="dv-chip-label">SITE</span>
@@ -221,39 +221,39 @@ export default function DossierValidation() {
             {/* RIGHT ────────────────────────────── */}
             <div className="dv-right">
 
-              {/* Équipements Estimés */}
-              <section className="dv-card">
-                <h2 className="dv-card-title">Équipements Estimés</h2>
-                <table className="dv-equip-table">
-                  <thead>
-                    <tr>
-                      <th>ARTICLE</th>
-                      <th>QUANTITÉ</th>
-                      <th>VALEUR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.equipements.map((item, i) => {
-                      const IconComponent = item.Icon;
-                      return (
-                        <tr key={i}>
-                          <td>
-                            <div className="dv-equip-label">
-                              <span className="dv-equip-icon"><IconComponent /></span>
-                              {item.label}
-                            </div>
-                          </td>
-                          <td className="dv-equip-qty">{item.qty}</td>
-                          <td className="dv-equip-val">{item.val}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div className="dv-total-row">
-                  <span className="dv-total-label">Total Estimé</span>
-                  <span className="dv-total-val">{data.total}</span>
+              {/* Équipements Sinistrés */}
+              <section className="dv-card" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                <div className="dv-card-title-row dv-card-title-row--between" style={{ marginBottom: 16 }}>
+                  <h2 className="dv-card-title" style={{ fontSize: 13.5, color: '#222' }}>Équipements Sinistrés</h2>
+                  <button style={{ border: 'none', background: 'transparent', color: '#b91c1c', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width="13" height="13"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    Ajouter
+                  </button>
                 </div>
+                
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {data.equipements.map((item, i) => (
+                    <li key={i} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderRadius: '8px', background: '#f5f4f4' }}>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: '13px', fontWeight: '700', color: '#222', margin: '0 0 4px' }}>{item.label}</p>
+                        <p style={{ fontSize: '9.5px', color: '#a0a0a0', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>QUANTITÉ: {item.qty} {item.qty === '1x' ? 'UNITÉ' : 'UNITÉS'}</p>
+                      </div>
+                      <button style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', padding: '4px' }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              {/* Estimation Financière */}
+              <section className="dv-card" style={{ paddingTop: 24 }}>
+                <h2 className="dv-card-title" style={{ fontSize: 13.5, color: '#222', marginBottom: 12 }}>Estimation Financière (DZD)</h2>
+                <div style={{ background: '#ececec', borderRadius: '8px', padding: '18px 24px', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ color: '#999', fontWeight: '700', fontSize: '13px' }}>DA</span>
+                  <span style={{ marginLeft: '12px', fontSize: '24px', fontWeight: '800', color: '#b91c1c' }}>{data.total.replace(' DZD', '')}</span>
+                </div>
+                <p style={{ fontStyle: 'italic', color: '#a0a0a0', fontSize: '10.5px', margin: '8px 0 0 4px' }}>Basé sur les prix catalogues Q4 2023</p>
               </section>
 
               {/* Pièces Jointes */}
@@ -272,6 +272,9 @@ export default function DossierValidation() {
                     <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     <span>Rapport.pdf</span>
                   </div>
+                  <div className="dv-pj-thumb dv-pj-upload" style={{ background: '#fafafa', border: '1.5px dashed #ddd', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#aaa', cursor: 'pointer', transition: 'border-color 0.2s, color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#b91c1c'; e.currentTarget.style.color = '#b91c1c'; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#ddd'; e.currentTarget.style.color = '#aaa'; }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="24" height="24" style={{ marginBottom: '2px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                  </div>
                 </div>
               </section>
             </div>
@@ -279,14 +282,12 @@ export default function DossierValidation() {
 
           <div className="dv-actions">
             <button
-              className="dv-hold-btn"
-              onClick={handleInfoManquante}
+              className="dv-pdf-btn"
+              style={{ width: '100%', justifyContent: 'center' }}
+              onClick={handleCompleterDossier}
             >
-              Mettre en Attente (Infos Manquantes)
-            </button>
-            <button className="dv-pdf-btn" onClick={() => window.print()}>
-              Générer PDF
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              Compléter le dossier
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
             </button>
           </div>
         </main>

@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import Sidebar from '../../componenets/Sidebar/Sidebar'
+import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './DossierValidation.css'
 
 /* ── Mock data (keyed by dossier id) ─────────────────── */
@@ -65,38 +65,38 @@ const natureStyle = {
   'Accident':         { bg: '#d1fae5', color: '#065f46' },
 }
 
-export default function DossierCompleterDetail() {
+export default function DossierValidation() {
   const { id } = useParams()
   const navigate = useNavigate()
 
   /* Normalise the id - URL uses the raw id like RZY-2023-6642 */
   const data = dossiers[id] || dossiers['RZY-2023-6642']
   const ns   = natureStyle[data.nature] || { bg: '#f0f0f0', color: '#555' }
-  const handleCompleterDossier = () => {
+
+  const handleInfoManquante = () => {
     try {
-      const savedCompleter = JSON.parse(localStorage.getItem('dossiersCompleter') || '[]');
       const savedValider = JSON.parse(localStorage.getItem('dossiersValider') || '[]');
+      const savedCompleter = JSON.parse(localStorage.getItem('dossiersCompleter') || '[]');
       
-      const dossierIndex = savedCompleter.findIndex(d => d.id === id || d.id === '#' + id);
+      const dossierIndex = savedValider.findIndex(d => d.id.includes(id));
       if (dossierIndex !== -1) {
-        const movedDossier = savedCompleter.splice(dossierIndex, 1)[0];
-        savedValider.unshift({
+        const movedDossier = savedValider.splice(dossierIndex, 1)[0];
+        savedCompleter.unshift({
           id: movedDossier.id,
           site: movedDossier.site,
           ville: movedDossier.ville || 'À préciser',
           date: movedDossier.date,
           nature: movedDossier.nature,
-          montant: '1,450,000.00',
-          devise: 'DZD'
+          statut: 'EN ATTENTE'
         });
         
-        localStorage.setItem('dossiersCompleter', JSON.stringify(savedCompleter));
         localStorage.setItem('dossiersValider', JSON.stringify(savedValider));
+        localStorage.setItem('dossiersCompleter', JSON.stringify(savedCompleter));
       }
     } catch (e) {
       console.error(e);
     }
-    navigate('/declarations', { state: { tab: 'valider' } });
+    navigate('/declarations', { state: { tab: 'completer' } });
   }
 
   return (
@@ -123,12 +123,12 @@ export default function DossierCompleterDetail() {
             <div className="dv-page-meta">
               <span className="dv-eyebrow">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                DOSSIER EN ATTENTE
+                DOSSIER EN RÉVISION
               </span>
               <span className="dv-eyebrow-id">#{id || 'RZY-2023-0842'}</span>
             </div>
             <div className="dv-header-row">
-              <h1 className="dv-title">Dossier à Compléter</h1>
+              <h1 className="dv-title">Validation du Dossier</h1>
               <div className="dv-chips">
                 <div className="dv-chip">
                   <span className="dv-chip-label">SITE</span>
@@ -279,12 +279,14 @@ export default function DossierCompleterDetail() {
 
           <div className="dv-actions">
             <button
-              className="dv-pdf-btn"
-              style={{ width: '100%', justifyContent: 'center' }}
-              onClick={handleCompleterDossier}
+              className="dv-hold-btn"
+              onClick={handleInfoManquante}
             >
-              Compléter le dossier
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Mettre en Attente (Infos Manquantes)
+            </button>
+            <button className="dv-pdf-btn" onClick={() => window.print()}>
+              Générer PDF
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
             </button>
           </div>
         </main>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Sidebar from '../../componenets/Sidebar/Sidebar'
+import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './GestionDossiers.css'
 
 /* ── Constants ───────────────────────────────────────── */
@@ -155,15 +155,18 @@ export default function GestionDossiers() {
                   <th>SITE CONCERNÉ</th>
                   <th>TYPE DE SINISTRE</th>
                   <th>STATUT</th>
-                  <th>COÛT ESTIMÉ (DZD)</th>
+                  <th>COÛT ESTIMÉ<br/><span style={{ fontSize: '9px', color: '#a0aec0' }}>(DZD)</span></th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {mockDossiers.map(d => (
                   <tr key={d.id}>
-                    <td className="gd-id-cell">{d.id}</td>
-                    <td className="gd-date-cell">{d.date}</td>
+                    <td className="gd-id-cell">{d.id.replace(/(.{4})-(.{4})-(.{3})/, '$1-\n$2-\n$3').split('\n').map((line, i) => <span key={i} style={{ display: 'block' }}>{line}</span>)}</td>
+                    <td className="gd-date-cell">
+                      <span style={{ display: 'block', color: '#4a5568' }}>{d.date.split(' ')[0]} {d.date.split(' ')[1]}</span>
+                      <span style={{ display: 'block', color: '#a0aec0', fontSize: '12px' }}>{d.date.split(' ')[2]}</span>
+                    </td>
                     <td>
                       <div className="gd-site-cell">
                         <IconPin />

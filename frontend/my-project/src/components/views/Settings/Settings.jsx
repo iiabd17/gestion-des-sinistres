@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Sidebar from '../../componenets/Sidebar/Sidebar'
+import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './Settings.css'
 
 /* ── Mock Data ───────────────────────────────────────── */

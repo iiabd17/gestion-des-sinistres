@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import Sidebar from '../../componenets/Sidebar/Sidebar'
+import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './DossierGestionDetail.css'
 
 /* ── Mock Data for Details ──────────────────────────── */
