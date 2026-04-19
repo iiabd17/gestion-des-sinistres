@@ -25,7 +25,10 @@ from rest_framework_simplejwt.views import (
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-  #  les sinistres
+    # les comptes utilisateurs
+    path('api/accounts/', include('accounts.urls')),
+    
+    # les sinistres
     path('api/', include('sinistres.urls')),
     
     # les tokens (connexion)
