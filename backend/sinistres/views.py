@@ -237,6 +237,18 @@ class SinistreListCreateView(APIView):
         if nature_filter:
             sinistres = sinistres.filter(nature=nature_filter)
 
+        sinistres = sinistres.select_related('site', 'createur').order_by('-dateCreation')
+
+        # Pagination manuelle (APIView ne pagine pas automatiquement)
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
+        paginator.page_size = int(request.query_params.get('page_size', 20))
+        page = paginator.paginate_queryset(sinistres, request)
+
+        if page is not None:
+            serializer = SinistreListSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
         serializer = SinistreListSerializer(sinistres, many=True)
         return Response(serializer.data)
 

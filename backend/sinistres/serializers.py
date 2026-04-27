@@ -109,6 +109,7 @@ class SinistreListSerializer(serializers.ModelSerializer):
     typeSinistre_label = serializers.CharField(source='get_typeSinistre_display', read_only=True)
     statut_label       = serializers.CharField(source='get_statut_display', read_only=True)
     codeSite           = serializers.CharField(source='site.codeSite', read_only=True)
+    nomSite            = serializers.CharField(source='site.nomSite', read_only=True)
     wilaya             = serializers.CharField(source='site.wilaya', read_only=True)
     createur_nom       = serializers.SerializerMethodField(read_only=True)
 
@@ -118,7 +119,7 @@ class SinistreListSerializer(serializers.ModelSerializer):
             'idSinistre', 'nature', 'nature_label',
             'typeSinistre', 'typeSinistre_label',
             'dateSurvenance', 'statut', 'statut_label', 'urgence',
-            'codeSite', 'wilaya', 'montantEstime',
+            'codeSite', 'nomSite', 'wilaya', 'montantEstime',
             'dateCreation', 'createur', 'createur_nom',
         ]
 

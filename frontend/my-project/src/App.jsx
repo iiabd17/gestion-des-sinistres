@@ -35,8 +35,8 @@ function App() {
             <Route path="/declarations/new" element={<NewDeclarationPage />} />
           </Route>
 
-          {/* Routes Ingénieur & Assurance & HSE & Légal */}
-          <Route element={<ProtectedRoute allowedRoles={['INGENIEUR', 'ASSURANCE', 'HSE', 'LEGAL', 'ADMIN']} />}>
+          {/* Routes Déclarations (liste) */}
+          <Route element={<ProtectedRoute allowedRoles={['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'HSE', 'LEGAL', 'ADMIN']} />}>
             <Route path="/declarations" element={<DeclarationsPage />} />
             <Route path="/declarations/completer/:id" element={<DossierCompleterDetailPage />} />
           </Route>
