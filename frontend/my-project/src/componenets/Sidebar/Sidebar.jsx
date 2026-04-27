@@ -1,16 +1,31 @@
+import { useContext } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { AuthContext } from '../../context/AuthContext'
 import './Sidebar.css'
-
-const navItems = [
-  { id: 'tableau',      label: 'Tableau de Bord',      path: '/dashboard',    icon: IconGrid },
-  { id: 'declarations', label: 'Déclarations',          path: '/declarations', icon: IconDoc },
-  { id: 'gestion',      label: 'Gestion des dossiers',  path: '/gestion',      icon: IconFolder },
-  { id: 'archives',     label: 'Archives',              path: '/archives',     icon: IconArchive },
-]
 
 export default function Sidebar() {
   const navigate  = useNavigate()
   const { pathname } = useLocation()
+  const { user, logout } = useContext(AuthContext)
+
+  // Roles to permissions (from UML):
+  // EQUIPE_TERRAIN: Dashboard, Déclarations (New)
+  // INGENIEUR: Dashboard, Déclarations (List/Complete)
+  // ASSURANCE: Dashboard, Déclarations, Gestion des dossiers, Archives, Paramètres
+  // LEGAL: Dashboard, Gestion des dossiers, Archives
+  // HSE: Dashboard, Gestion des dossiers, Archives
+  // ADMIN: All
+
+  const role = user?.role || '';
+
+  const navItems = [
+    { id: 'tableau',      label: 'Tableau de Bord',      path: '/dashboard',    icon: IconGrid, roles: ['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'LEGAL', 'HSE', 'ADMIN'] },
+    { id: 'declarations', label: 'Déclarations',          path: '/declarations', icon: IconDoc, roles: ['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN'] },
+    { id: 'gestion',      label: 'Gestion des dossiers',  path: '/gestion',      icon: IconFolder, roles: ['ASSURANCE', 'LEGAL', 'HSE', 'ADMIN'] },
+    { id: 'archives',     label: 'Archives',              path: '/archives',     icon: IconArchive, roles: ['ASSURANCE', 'LEGAL', 'HSE', 'ADMIN'] },
+  ]
+
+  const visibleNavItems = navItems.filter(item => item.roles.includes(role))
 
   return (
     <aside className="sb-sidebar">
@@ -24,7 +39,7 @@ export default function Sidebar() {
 
       {/* Main nav */}
       <nav className="sb-nav">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const IconComponent = item.icon;
           return (
             <button
@@ -45,12 +60,29 @@ export default function Sidebar() {
           <IconSupport />
           <span>Support</span>
         </button>
+        {['ASSURANCE', 'ADMIN'].includes(role) && (
+          <button 
+            className={`sb-nav-item ${pathname.startsWith('/settings') ? 'sb-nav-item--active' : ''}`}
+            onClick={() => navigate('/settings')}
+          >
+            <IconSettings />
+            <span>Paramètres</span>
+          </button>
+        )}
         <button 
-          className={`sb-nav-item ${pathname.startsWith('/settings') ? 'sb-nav-item--active' : ''}`}
-          onClick={() => navigate('/settings')}
+          className="sb-nav-item"
+          onClick={() => {
+            logout();
+            navigate('/login');
+          }}
+          style={{ color: '#E2000F', marginTop: '10px' }}
         >
-          <IconSettings />
-          <span>Paramètres</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: '20px', height: '20px', marginRight: '12px' }}>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          <span>Déconnexion</span>
         </button>
       </div>
     </aside>

@@ -1,42 +1,42 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AuthContext } from '../../../context/AuthContext'
+import api from '../../../api'
 import './Login.css'
 
 function Login() {
   const navigate = useNavigate()
+  const { login } = useContext(AuthContext)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setLoading(true)
     
     try {
-      const response = await fetch('http://localhost:8000/api/token/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          username: email,  // Django SimpleJWT uses 'username' by default
-          password: password 
-        }),
+      const response = await api.post('/token/', {
+        username: email,
+        password: password 
       })
 
-      if (!response.ok) {
-        throw new Error('Identifiants incorrects. Veuillez réessayer.')
-      }
-
-      const data = await response.json()
-      
-      // Save JWT tokens securely
-      localStorage.setItem('access_token', data.access)
-      localStorage.setItem('refresh_token', data.refresh)
+      // Use the login function from AuthContext which handles token storage and user decoding
+      login(response.data)
 
       navigate('/dashboard')
     } catch (err) {
-      setError(err.message)
+      if (err.response && err.response.data && err.response.data.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError('Identifiants incorrects. Veuillez réessayer.')
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -167,12 +167,14 @@ function Login() {
             </label>
 
             {/* Submit */}
-            <button type="submit" id="btn-login" className="lp-btn">
-              Se connecter
-              <svg className="lp-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
+            <button type="submit" id="btn-login" className="lp-btn" disabled={loading}>
+              {loading ? 'Connexion...' : 'Se connecter'}
+              {!loading && (
+                <svg className="lp-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              )}
             </button>
           </form>
         </div>

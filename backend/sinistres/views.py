@@ -1,457 +1,887 @@
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+"""
+sinistres/views.py
+──────────────────
+Vues API REST pour le système de gestion des sinistres Djezzy.
+
+Toutes les vues utilisent des APIViews DRF avec les permission
+classes importées depuis accounts.permissions.
+
+Workflow (Diagramme de séquence) :
+    1. Équipe Terrain  → déclare le sinistre        (OUVERT)
+    2. Ingénieur       → complète et transmet        (EN_EXPERTISE)
+    3. Assurance        → rejette pour complément ou valide
+    4. Légal           → upload PV si nature == VOL  (EN_VALIDATION_LEGAL)
+    5. HSE             → upload rapport si INCENDIE  (EN_VALIDATION_HSE)
+    6. Assurance        → décision finale            (VALIDE / REJETE)
+    7. Assurance        → clôture                    (CLOTURE)
+    8. Assurance        → archive                    (ARCHIVE)
+"""
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
-import json
+from django.db import transaction
+from django.db.models import Q
 
 from .models import (
-    Sinistre, Declaration, Equipement, PieceJointe, Site,
-    NATURE_CHOICES, TYPE_PAR_NATURE, ALL_TYPE_CHOICES
+    Site, Sinistre, Equipement, PieceJointe, HistoriqueStatut,
+    NATURE_CHOICES, TYPE_PAR_NATURE, STATUT_CHOICES, URGENCE_CHOICES,
+)
+from .serializers import (
+    SiteSerializer,
+    SinistreListSerializer,
+    SinistreDetailSerializer,
+    SinistreCreateSerializer,
+    EquipementSerializer,
+    PieceJointeSerializer,
+    HistoriqueStatutSerializer,
+)
+from accounts.permissions import (
+    IsEquipeTerrain,
+    IsIngenieur,
+    IsLegal,
+    IsHse,
+    IsAssurance,
+    IsAdmin,
 )
 
 
-#  Helpers
+# ═════════════════════════════════════════════
+#  HELPER : Enregistrer un changement de statut
+# ═════════════════════════════════════════════
+
+def _log_changement_statut(sinistre, ancien, nouveau, user, commentaire=''):
+    """Crée une entrée dans le journal HistoriqueStatut."""
+    HistoriqueStatut.objects.create(
+        sinistre=sinistre,
+        ancienStatut=ancien,
+        nouveauStatut=nouveau,
+        modifiePar=user,
+        commentaire=commentaire,
+    )
 
 
-def json_body(request):
-    try:
-        return json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return None
+# ═════════════════════════════════════════════
+#  PERMISSION HELPERS (combinaisons OR)
+# ═════════════════════════════════════════════
 
-def not_found(message="Objet introuvable"):
-    return JsonResponse({"error": message}, status=404)
+class IsAnyAuthenticated(permissions.BasePermission):
+    """Tout utilisateur authentifié et actif."""
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'estActif', False)
+        )
 
-def bad_request(message="Données invalides"):
-    return JsonResponse({"error": message}, status=400)
+
+class IsEquipeTerrainOrAssurance(permissions.BasePermission):
+    """Équipe Terrain OU Assurance (pour la création de sinistre)."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        return (
+            hasattr(request.user, 'equipeterrain')
+            or hasattr(request.user, 'assurance')
+            or request.user.is_staff
+            or request.user.is_superuser
+        )
 
 
+class IsIngenieurOrAssurance(permissions.BasePermission):
+    """Ingénieur OU Assurance."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        return (
+            hasattr(request.user, 'ingenieur')
+            or hasattr(request.user, 'assurance')
+            or request.user.is_staff
+            or request.user.is_superuser
+        )
 
+
+# ═════════════════════════════════════════════
 #  REFERENTIEL NATURE / TYPE
+# ═════════════════════════════════════════════
 
-@require_http_methods(["GET"])
-def nature_list(request):
-    """GET /natures/ → liste toutes les natures disponibles."""
-    natures = [{"code": code, "label": label} for code, label in NATURE_CHOICES]
-    return JsonResponse(natures, safe=False)
+class ConstantsView(APIView):
+    """
+    GET /api/constants/
+    Renvoie les listes de choix (Constantes) pour le frontend.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
-
-@require_http_methods(["GET"])
-def types_par_nature(request, nature_code):
-    """GET /natures/<nature_code>/types/ → types appartenant à cette nature."""
-    types = TYPE_PAR_NATURE.get(nature_code)
-    if types is None:
-        return not_found(f"Nature '{nature_code}' introuvable.")
-    return JsonResponse(
-        [{"code": code, "label": label} for code, label in types],
-        safe=False
-    )
-
-
-
-#  SITE
-
-
-@csrf_exempt
-@require_http_methods(["GET", "POST"])
-def site_list(request):
-    if request.method == "GET":
-        sites = list(Site.objects.values(
-            'idSite', 'codeSite', 'adresseSite', 'wilaya', 'codeRegion'
-        ))
-        return JsonResponse(sites, safe=False)
-
-    data = json_body(request)
-    if not data:
-        return bad_request()
-
-    site = Site.objects.create(
-        codeSite   =data.get('codeSite', ''),
-        adresseSite=data.get('adresseSite', ''),
-        wilaya     =data.get('wilaya', ''),
-        codeRegion =data.get('codeRegion', ''),
-    )
-    return JsonResponse({
-        "idSite": site.idSite, "codeSite": site.codeSite,
-        "adresseSite": site.adresseSite, "wilaya": site.wilaya,
-    }, status=201)
-
-
-@csrf_exempt
-@require_http_methods(["GET", "PUT", "DELETE"])
-def site_detail(request, pk):
-    try:
-        site = Site.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found("Site introuvable")
-
-    if request.method == "GET":
-        return JsonResponse({
-            "idSite": site.idSite, "codeSite": site.codeSite,
-            "adresseSite": site.adresseSite, "wilaya": site.wilaya,
-            "codeRegion": site.codeRegion,
+    def get(self, request):
+        return Response({
+            'natures': [{'code': code, 'label': label} for code, label in NATURE_CHOICES],
+            'types_par_nature': {nature: [{'code': c, 'label': l} for c, l in types] for nature, types in TYPE_PAR_NATURE.items()},
+            'statuts': [{'code': code, 'label': label} for code, label in STATUT_CHOICES],
+            'urgences': [{'code': code, 'label': label} for code, label in URGENCE_CHOICES],
+            'types_pieces': [{'code': code, 'label': label} for code, label in PieceJointe.TYPE_PIECE_CHOICES],
         })
 
-    if request.method == "PUT":
-        data = json_body(request)
-        if not data:
-            return bad_request()
-        for field in ('codeSite', 'adresseSite', 'wilaya', 'codeRegion'):
-            if field in data:
-                setattr(site, field, data[field])
-        site.save()
-        return JsonResponse({"message": "Site mis à jour"})
 
-    site.delete()
-    return JsonResponse({"message": "Site supprimé"}, status=204)
+# ═════════════════════════════════════════════
+#  SITE — CRUD
+# ═════════════════════════════════════════════
 
+class SiteListCreateView(APIView):
+    """
+    GET  /api/sites/       → Liste tous les sites (tout utilisateur authentifié)
+    POST /api/sites/       → Crée un site (Assurance Directrice / Admin)
+    """
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated(), IsAssurance()]
+        return [permissions.IsAuthenticated()]
 
-#  SINISTRE
+    def get(self, request):
+        sites = Site.objects.all()
 
+        # Recherche par codeSite ou nomSite (pour l'autocomplete frontend)
+        search = request.query_params.get('search', '').strip()
+        if search:
+            sites = sites.filter(
+                Q(codeSite__icontains=search) |
+                Q(nomSite__icontains=search)
+            )
 
-def _sinistre_to_dict(s):
-    return {
-        "idSinistre":            s.idSinistre,
-        "nature":                s.nature,
-        "nature_label":          s.get_nature_display(),
-        "typeSinistre":          s.typeSinistre,
-        "typeSinistre_label":    s.get_typeSinistre_display(),
-        "dateSurvenance":        str(s.dateSurvenance),
-        "codeSite":              s.site.codeSite,
-        "adresseSite":           s.site.adresseSite,
-        "wilaya":                s.site.wilaya,
-        "descriptionDetailliee": s.descriptionDetailliee,
-        "montantEstime":         s.montantEstime,
-    }
+        # Limiter les résultats pour l'autocomplete (26k+ sites en BDD)
+        sites = sites[:50]
 
+        serializer = SiteSerializer(sites, many=True)
+        return Response(serializer.data)
 
-@csrf_exempt
-@require_http_methods(["GET", "POST"])
-def sinistre_list(request):
-    if request.method == "GET":
-        sinistres = [_sinistre_to_dict(s) for s in Sinistre.objects.all()]
-        return JsonResponse(sinistres, safe=False)
-
-    data = json_body(request)
-    if not data:
-        return bad_request()
-
-    sinistre = Sinistre(
-        idSinistre           =data.get('idSinistre'),
-        nature               =data.get('nature'),
-        typeSinistre         =data.get('typeSinistre'),
-        dateSurvenance       =data.get('dateSurvenance'),
-        descriptionDetailliee=data.get('descriptionDetailliee', ''),
-        montantEstime        =data.get('montantEstime', 0.0),
-        site_id              =data.get('codeSite'),   # codeSite de Site
-    )
-    try:
-        sinistre.clean()  # valide nature/type
-    except ValidationError as e:
-        return bad_request(str(e))
-
-    sinistre.save()
-    return JsonResponse(_sinistre_to_dict(sinistre), status=201)
+    @transaction.atomic
+    def post(self, request):
+        serializer = SiteSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@csrf_exempt
-@require_http_methods(["GET", "PUT", "DELETE"])
-def sinistre_detail(request, pk):
-    try:
-        sinistre = Sinistre.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found("Sinistre introuvable")
+class SiteDetailView(APIView):
+    """
+    GET    /api/sites/<pk>/   → Détail d'un site
+    PUT    /api/sites/<pk>/   → Mise à jour (Assurance / Admin)
+    DELETE /api/sites/<pk>/   → Suppression (Assurance / Admin)
+    """
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'DELETE'):
+            return [permissions.IsAuthenticated(), IsAssurance()]
+        return [permissions.IsAuthenticated()]
 
-    if request.method == "GET":
-        return JsonResponse(_sinistre_to_dict(sinistre))
+    def get(self, request, pk):
+        site = get_object_or_404(Site, pk=pk)
+        return Response(SiteSerializer(site).data)
 
-    if request.method == "PUT":
-        data = json_body(request)
-        if not data:
-            return bad_request()
-        for field in ('nature', 'typeSinistre', 'dateSurvenance',
-                      'descriptionDetailliee', 'montantEstime'):
-            if field in data:
-                setattr(sinistre, field, data[field])
-        if 'codeSite' in data:
-            sinistre.site_id = data['codeSite']
-        try:
-            sinistre.clean()
-        except ValidationError as e:
-            return bad_request(str(e))
+    @transaction.atomic
+    def put(self, request, pk):
+        site = get_object_or_404(Site, pk=pk)
+        serializer = SiteSerializer(site, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        site = get_object_or_404(Site, pk=pk)
+        site.delete()
+        return Response(
+            {'message': 'Site supprimé.'},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+# ═════════════════════════════════════════════
+#  SINISTRE — Liste & Création
+# ═════════════════════════════════════════════
+
+class SinistreListCreateView(APIView):
+    """
+    GET  /api/sinistres/       → Liste des sinistres
+        - Équipe Terrain : voit uniquement ses propres sinistres
+        - Autres rôles   : voient tous les sinistres
+    POST /api/sinistres/       → Déclarer un nouveau sinistre
+        - Réservé à Équipe Terrain et Assurance
+        - Statut initial : OUVERT
+    """
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated(), IsEquipeTerrain()]
+        return [permissions.IsAuthenticated()]
+
+    def get(self, request):
+        user = request.user
+
+        # Équipe Terrain : ne voit que ses propres sinistres
+        if hasattr(user, 'equipeterrain'):
+            sinistres = Sinistre.objects.filter(createur=user)
+        else:
+            sinistres = Sinistre.objects.all()
+
+        # Filtres optionnels via query params
+        statut_filter = request.query_params.get('statut')
+        nature_filter = request.query_params.get('nature')
+        if statut_filter:
+            sinistres = sinistres.filter(statut=statut_filter)
+        if nature_filter:
+            sinistres = sinistres.filter(nature=nature_filter)
+
+        serializer = SinistreListSerializer(sinistres, many=True)
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = SinistreCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            sinistre = serializer.save(createur=request.user, statut='OUVERT')
+
+            # Journaliser la création
+            _log_changement_statut(
+                sinistre, '', 'OUVERT', request.user,
+                'Déclaration initiale du sinistre.'
+            )
+
+            return Response(
+                SinistreDetailSerializer(sinistre).data,
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ═════════════════════════════════════════════
+#  SINISTRE — Détail, Mise à jour, Suppression
+# ═════════════════════════════════════════════
+
+class SinistreDetailView(APIView):
+    """
+    GET    /api/sinistres/<pk>/    → Détail complet
+    PUT    /api/sinistres/<pk>/    → Mise à jour (champs descriptifs)
+    DELETE /api/sinistres/<pk>/    → Suppression (Admin / Assurance uniquement)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+        return Response(SinistreDetailSerializer(sinistre).data)
+
+    @transaction.atomic
+    def put(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        # Seul le créateur, un ingénieur, ou l'assurance peut modifier
+        user = request.user
+        is_creator  = sinistre.createur == user
+        is_ing      = hasattr(user, 'ingenieur')
+        is_assur    = hasattr(user, 'assurance')
+        is_admin    = user.is_staff or user.is_superuser
+
+        if not (is_creator or is_ing or is_assur or is_admin):
+            return Response(
+                {'error': "Vous n'avez pas la permission de modifier ce sinistre."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Champs modifiables selon le statut
+        allowed_fields = [
+            'descriptionDetailliee', 'montantEstime', 'urgence',
+            'heureSurvenance',
+        ]
+        update_data = {k: v for k, v in request.data.items() if k in allowed_fields}
+
+        for field, value in update_data.items():
+            setattr(sinistre, field, value)
         sinistre.save()
-        return JsonResponse({"message": "Sinistre mis à jour"})
 
-    sinistre.delete()
-    return JsonResponse({"message": "Sinistre supprimé"}, status=204)
+        return Response(SinistreDetailSerializer(sinistre).data)
 
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def sinistre_update_estimation(request, pk):
-    try:
-        sinistre = Sinistre.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found()
-    data = json_body(request)
-    if not data or 'montantEstime' not in data:
-        return bad_request("Champ 'montantEstime' requis")
-    sinistre.mettreAJourEstimation(data['montantEstime'])
-    return JsonResponse({"montantEstime": sinistre.montantEstime})
-
-
-@require_http_methods(["GET"])
-def sinistre_details_complets(request, pk):
-    try:
-        sinistre = Sinistre.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found()
-    return JsonResponse({"details": sinistre.obtenirDetailsComplets()})
-
-
-
-#  DECLARATION
-
-def _declaration_to_dict(d):
-    return {
-        "idDeclaration": d.idDeclaration,
-        "dateCreation":  str(d.dateCreation),
-        "etatActuel":    d.etatActuel,
-        "urgence":       d.urgence,
-        "sinistre_id":   d.sinistre_id,
-    }
-
-
-@csrf_exempt
-@require_http_methods(["GET", "POST"])
-def declaration_list(request):
-    if request.method == "GET":
-        return JsonResponse(
-            [_declaration_to_dict(d) for d in Declaration.objects.all()],
-            safe=False
+    def delete(self, request, pk):
+        user = request.user
+        if not (hasattr(user, 'assurance') or user.is_staff or user.is_superuser):
+            return Response(
+                {'error': 'Seuls les administrateurs et l\'assurance peuvent supprimer un sinistre.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+        sinistre.delete()
+        return Response(
+            {'message': 'Sinistre supprimé.'},
+            status=status.HTTP_204_NO_CONTENT,
         )
-    data = json_body(request)
-    if not data:
-        return bad_request()
-    declaration = Declaration.objects.create(
-        idDeclaration=data.get('idDeclaration'),
-        etatActuel   =data.get('etatActuel', 'EN_ATTENTE'),
-        urgence      =data.get('urgence', 1),
-        sinistre_id  =data.get('sinistre_id'),
-    )
-    return JsonResponse(_declaration_to_dict(declaration), status=201)
 
 
-@csrf_exempt
-@require_http_methods(["GET", "PUT", "DELETE"])
-def declaration_detail(request, pk):
-    try:
-        declaration = Declaration.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found("Déclaration introuvable")
+# ═════════════════════════════════════════════
+#  WORKFLOW STEP 1 : Ingénieur → Expertise technique
+# ═════════════════════════════════════════════
 
-    if request.method == "GET":
-        return JsonResponse(_declaration_to_dict(declaration))
+class SinistreExpertiseView(APIView):
+    """
+    POST /api/sinistres/<pk>/expertise/
 
-    if request.method == "PUT":
-        data = json_body(request)
-        if not data:
-            return bad_request()
-        for field in ('etatActuel', 'urgence'):
-            if field in data:
-                setattr(declaration, field, data[field])
-        declaration.save()
-        return JsonResponse({"message": "Déclaration mise à jour"})
+    L'ingénieur complète l'évaluation technique et transmet le dossier.
+    Transition : OUVERT | REJET_POUR_COMPLEMENT → EN_EXPERTISE
 
-    declaration.delete()
-    return JsonResponse({"message": "Déclaration supprimée"}, status=204)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def declaration_changer_etat(request, pk):
-    try:
-        declaration = Declaration.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found()
-    data = json_body(request)
-    if not data or 'etatActuel' not in data:
-        return bad_request("Champ 'etatActuel' requis")
-    try:
-        declaration.changerEtat(data['etatActuel'])
-    except ValueError as e:
-        return bad_request(str(e))
-    return JsonResponse({"etatActuel": declaration.etatActuel})
-
-
-@require_http_methods(["GET"])
-def declaration_temps_traitement(request, pk):
-    try:
-        declaration = Declaration.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found()
-    return JsonResponse({"tempsTraitementSecondes": declaration.calculerTempsTraitement()})
-
-
-# ─────────────────────────────────────────────
-#  EQUIPEMENT
-# ─────────────────────────────────────────────
-
-def _equipement_to_dict(e):
-    return {
-        "idEquipement":     e.idEquipement,
-        "nomMarque":        e.nomMarque,
-        "numeroSerie":      e.numeroSerie,
-        "dateInstallation": str(e.dateInstallation) if e.dateInstallation else None,
-        "valeurComptable":  e.valeurComptable,
-        "quantiteImpactee": e.quantiteImpactee,
-        "sinistre_id":      e.sinistre_id,
+    Body JSON :
+    {
+        "observationsIngenieur": "Description technique...",
+        "montantEstime": 150000.0
     }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsIngenieur]
 
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
 
-@csrf_exempt
-@require_http_methods(["GET", "POST"])
-def equipement_list(request):
-    if request.method == "GET":
-        return JsonResponse(
-            [_equipement_to_dict(e) for e in Equipement.objects.all()],
-            safe=False
+        # Vérifier le statut attendu
+        if sinistre.statut not in ('OUVERT', 'REJET_POUR_COMPLEMENT'):
+            return Response(
+                {'error': f"Ce sinistre est en statut '{sinistre.get_statut_display()}'. "
+                          f"L'expertise n'est possible que pour les sinistres OUVERT ou REJETÉ POUR COMPLÉMENT."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ancien_statut = sinistre.statut
+
+        # Mise à jour des champs techniques
+        sinistre.observationsIngenieur = request.data.get(
+            'observationsIngenieur', sinistre.observationsIngenieur
         )
-    data = json_body(request)
-    if not data:
-        return bad_request()
-    equipement = Equipement.objects.create(
-        idEquipement    =data.get('idEquipement'),
-        nomMarque       =data.get('nomMarque', ''),
-        numeroSerie     =data.get('numeroSerie', ''),
-        dateInstallation=data.get('dateInstallation'),
-        valeurComptable =data.get('valeurComptable', 0.0),
-        quantiteImpactee=data.get('quantiteImpactee', 1),
-        sinistre_id     =data.get('sinistre_id'),
-    )
-    return JsonResponse(_equipement_to_dict(equipement), status=201)
+        if 'montantEstime' in request.data:
+            sinistre.montantEstime = request.data['montantEstime']
+
+        sinistre.statut = 'EN_EXPERTISE'
+        sinistre.save()
+
+        _log_changement_statut(
+            sinistre, ancien_statut, 'EN_EXPERTISE', request.user,
+            'Expertise technique complétée. Dossier transmis pour validation.'
+        )
+
+        return Response(SinistreDetailSerializer(sinistre).data)
 
 
-@csrf_exempt
-@require_http_methods(["GET", "PUT", "DELETE"])
-def equipement_detail(request, pk):
-    try:
-        equipement = Equipement.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found("Équipement introuvable")
+# ═════════════════════════════════════════════
+#  WORKFLOW STEP 2 : Assurance → Validation / Rejet pour complément
+# ═════════════════════════════════════════════
 
-    if request.method == "GET":
-        return JsonResponse(_equipement_to_dict(equipement))
+class SinistreValidationAssuranceView(APIView):
+    """
+    POST /api/sinistres/<pk>/validation/
 
-    if request.method == "PUT":
-        data = json_body(request)
-        if not data:
-            return bad_request()
-        for field in ('nomMarque', 'numeroSerie', 'dateInstallation',
-                      'valeurComptable', 'quantiteImpactee'):
-            if field in data:
-                setattr(equipement, field, data[field])
-        equipement.save()
-        return JsonResponse({"message": "Équipement mis à jour"})
+    L'assurance examine le dossier et décide :
+      - action = "VALIDER"  → transmet aux services internes (Legal/HSE)
+      - action = "REJETER"  → renvoie à l'ingénieur pour complément
 
-    equipement.delete()
-    return JsonResponse({"message": "Équipement supprimé"}, status=204)
-
-
-@require_http_methods(["GET"])
-def equipement_garantie(request, pk):
-    try:
-        equipement = Equipement.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found()
-    return JsonResponse({"sousGarantie": equipement.verifierGarantie()})
-
-
-# ─────────────────────────────────────────────
-#  PIECE JOINTE
-# ─────────────────────────────────────────────
-
-def _piece_to_dict(p):
-    return {
-        "idPiece":    p.idPiece,
-        "titreDoc":   p.titreDoc,
-        "format":     p.format,
-        "urlFichier": p.urlFichier,
-        "dateUpload": str(p.dateUpload),
-        "tailleKo":   p.tailleKo,
-        "sinistre_id":p.sinistre_id,
+    Body JSON :
+    {
+        "action": "VALIDER" | "REJETER",
+        "commentaire": "Motif optionnel..."
     }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAssurance]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        if sinistre.statut != 'EN_EXPERTISE':
+            return Response(
+                {'error': f"Ce sinistre doit être en statut 'En Expertise' pour être validé. "
+                          f"Statut actuel : {sinistre.get_statut_display()}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        action      = request.data.get('action', '').upper()
+        commentaire = request.data.get('commentaire', '')
+
+        if action == 'VALIDER':
+            ancien_statut = sinistre.statut
+
+            # Routage conditionnel selon la nature (diagramme de séquence)
+            if sinistre.nature == 'VOL' or sinistre.nature == 'ACTE_DE_SABOTAGE':
+                sinistre.statut = 'EN_VALIDATION_LEGAL'
+                msg = 'Dossier validé. Transmis au service Légal pour PV de Police.'
+            elif sinistre.nature == 'INCENDIE':
+                sinistre.statut = 'EN_VALIDATION_HSE'
+                msg = 'Dossier validé. Transmis au service HSE pour rapport d\'expertise.'
+            else:
+                sinistre.statut = 'TRANSMIS_ASSUREUR'
+                msg = 'Dossier validé. Transmis pour décision finale.'
+
+            sinistre.save()
+            _log_changement_statut(sinistre, ancien_statut, sinistre.statut, request.user, msg)
+
+        elif action == 'REJETER':
+            ancien_statut = sinistre.statut
+            sinistre.statut = 'REJET_POUR_COMPLEMENT'
+            sinistre.motifRejet = commentaire
+            sinistre.save()
+            _log_changement_statut(
+                sinistre, ancien_statut, 'REJET_POUR_COMPLEMENT', request.user,
+                f'Dossier rejeté pour complément. Motif : {commentaire}'
+            )
+
+        else:
+            return Response(
+                {'error': "L'action doit être 'VALIDER' ou 'REJETER'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(SinistreDetailSerializer(sinistre).data)
 
 
-@csrf_exempt
-@require_http_methods(["GET", "POST"])
-def piecejointe_list(request):
-    if request.method == "GET":
-        return JsonResponse(
-            [_piece_to_dict(p) for p in PieceJointe.objects.all()],
-            safe=False
+# ═════════════════════════════════════════════
+#  WORKFLOW STEP 3a : Légal → PV de Police (VOL)
+# ═════════════════════════════════════════════
+
+class SinistreValidationLegalView(APIView):
+    """
+    POST /api/sinistres/<pk>/validation-legal/
+
+    Le service Légal ajoute le numéro du PV de Police.
+    Transition : EN_VALIDATION_LEGAL → TRANSMIS_ASSUREUR
+
+    Body JSON :
+    {
+        "numeroPV": "PV-2026-00123",
+        "observationsLegal": "Observations optionnelles..."
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsLegal]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        if sinistre.statut != 'EN_VALIDATION_LEGAL':
+            return Response(
+                {'error': f"Ce sinistre doit être en statut 'En Validation Légale'. "
+                          f"Statut actuel : {sinistre.get_statut_display()}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        numero_pv = request.data.get('numeroPV')
+        if not numero_pv:
+            return Response(
+                {'error': "Le numéro du PV de Police est obligatoire."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ancien_statut = sinistre.statut
+        sinistre.numeroPV = numero_pv
+        sinistre.observationsLegal = request.data.get(
+            'observationsLegal', sinistre.observationsLegal
         )
-    data = json_body(request)
-    if not data:
-        return bad_request()
-    piece = PieceJointe.objects.create(
-        titreDoc   =data.get('titreDoc', ''),
-        format     =data.get('format', 'PDF'),
-        urlFichier =data.get('urlFichier', ''),
-        tailleKo   =data.get('tailleKo', 0),
-        sinistre_id=data.get('sinistre_id'),
-    )
-    return JsonResponse(_piece_to_dict(piece), status=201)
+        sinistre.statut = 'TRANSMIS_ASSUREUR'
+        sinistre.save()
+
+        _log_changement_statut(
+            sinistre, ancien_statut, 'TRANSMIS_ASSUREUR', request.user,
+            f'PV de Police ajouté (N° {numero_pv}). Dossier transmis à l\'assureur.'
+        )
+
+        return Response(SinistreDetailSerializer(sinistre).data)
 
 
-@csrf_exempt
-@require_http_methods(["GET", "DELETE"])
-def piecejointe_detail(request, pk):
-    try:
-        piece = PieceJointe.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found("Pièce jointe introuvable")
+# ═════════════════════════════════════════════
+#  WORKFLOW STEP 3b : HSE → Rapport d'expertise (INCENDIE)
+# ═════════════════════════════════════════════
 
-    if request.method == "GET":
-        return JsonResponse(_piece_to_dict(piece))
+class SinistreValidationHSEView(APIView):
+    """
+    POST /api/sinistres/<pk>/validation-hse/
 
-    piece.supprimer()
-    return JsonResponse({"message": "Pièce jointe supprimée"}, status=204)
+    Le service HSE ajoute ses observations et mesures correctives.
+    Transition : EN_VALIDATION_HSE → TRANSMIS_ASSUREUR
+
+    Body JSON :
+    {
+        "observationsHSE": "Observations de sécurité...",
+        "mesuresCorrectives": "Mesures proposées..."
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsHse]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        if sinistre.statut != 'EN_VALIDATION_HSE':
+            return Response(
+                {'error': f"Ce sinistre doit être en statut 'En Validation HSE'. "
+                          f"Statut actuel : {sinistre.get_statut_display()}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        observations = request.data.get('observationsHSE')
+        if not observations:
+            return Response(
+                {'error': "Les observations HSE sont obligatoires."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ancien_statut = sinistre.statut
+        sinistre.observationsHSE = observations
+        sinistre.mesuresCorrectives = request.data.get(
+            'mesuresCorrectives', sinistre.mesuresCorrectives
+        )
+        sinistre.statut = 'TRANSMIS_ASSUREUR'
+        sinistre.save()
+
+        _log_changement_statut(
+            sinistre, ancien_statut, 'TRANSMIS_ASSUREUR', request.user,
+            'Rapport HSE complété. Dossier transmis à l\'assureur.'
+        )
+
+        return Response(SinistreDetailSerializer(sinistre).data)
 
 
-@require_http_methods(["GET"])
-def piecejointe_telecharger(request, pk):
-    try:
-        piece = PieceJointe.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found()
-    return JsonResponse({"urlFichier": piece.telecharger()})
+# ═════════════════════════════════════════════
+#  WORKFLOW STEP 4 : Assurance → Décision finale
+# ═════════════════════════════════════════════
+
+class SinistreDecisionView(APIView):
+    """
+    POST /api/sinistres/<pk>/decision/
+
+    L'assurance rend la décision finale.
+    Transition : TRANSMIS_ASSUREUR → VALIDE (DSR) ou REJETE (DSNR)
+
+    Body JSON :
+    {
+        "decision": "ACCEPTER" | "REFUSER",
+        "montantIndemnisation": 120000.0,
+        "commentaire": "Motif..."
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAssurance]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        if sinistre.statut != 'TRANSMIS_ASSUREUR':
+            return Response(
+                {'error': f"Ce sinistre doit être en statut 'Transmis à l'Assureur'. "
+                          f"Statut actuel : {sinistre.get_statut_display()}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        decision    = request.data.get('decision', '').upper()
+        commentaire = request.data.get('commentaire', '')
+
+        if decision == 'ACCEPTER':
+            ancien_statut = sinistre.statut
+            sinistre.statut = 'VALIDE'
+            sinistre.montantIndemnisation = request.data.get(
+                'montantIndemnisation', sinistre.montantIndemnisation
+            )
+            sinistre.save()
+            _log_changement_statut(
+                sinistre, ancien_statut, 'VALIDE', request.user,
+                f'Dossier accepté (DSR). Prêt pour remboursement. {commentaire}'
+            )
+
+        elif decision == 'REFUSER':
+            ancien_statut = sinistre.statut
+            sinistre.statut = 'REJETE'
+            sinistre.motifRejet = commentaire
+            sinistre.save()
+            _log_changement_statut(
+                sinistre, ancien_statut, 'REJETE', request.user,
+                f'Dossier refusé (DSNR). Motif : {commentaire}'
+            )
+
+        else:
+            return Response(
+                {'error': "La décision doit être 'ACCEPTER' ou 'REFUSER'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(SinistreDetailSerializer(sinistre).data)
 
 
-# ─────────────────────────────────────────────
-#  VUES CROISÉES
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════
+#  WORKFLOW STEP 5 : Assurance → Clôture
+# ═════════════════════════════════════════════
 
-@require_http_methods(["GET"])
-def sinistre_equipements(request, pk):
-    try:
-        Sinistre.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found()
-    return JsonResponse(
-        [_equipement_to_dict(e) for e in Equipement.objects.filter(sinistre_id=pk)],
-        safe=False
-    )
+class SinistreCloturerView(APIView):
+    """
+    POST /api/sinistres/<pk>/cloturer/
+
+    Seule l'Assurance peut clôturer un sinistre.
+    Transition : VALIDE | REJETE → CLOTURE
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAssurance]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        if sinistre.statut not in ('VALIDE', 'REJETE'):
+            return Response(
+                {'error': f"Seuls les sinistres Validés ou Rejetés peuvent être clôturés. "
+                          f"Statut actuel : {sinistre.get_statut_display()}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ancien_statut = sinistre.statut
+        sinistre.statut = 'CLOTURE'
+        sinistre.dateCloture = timezone.now()
+        sinistre.save()
+
+        _log_changement_statut(
+            sinistre, ancien_statut, 'CLOTURE', request.user,
+            request.data.get('commentaire', 'Sinistre clôturé.')
+        )
+
+        return Response(SinistreDetailSerializer(sinistre).data)
 
 
-@require_http_methods(["GET"])
-def sinistre_pieces(request, pk):
-    try:
-        Sinistre.objects.get(pk=pk)
-    except ObjectDoesNotExist:
-        return not_found()
-    return JsonResponse(
-        [_piece_to_dict(p) for p in PieceJointe.objects.filter(sinistre_id=pk)],
-        safe=False
-    )
+# ═════════════════════════════════════════════
+#  WORKFLOW STEP 6 : Assurance → Archivage
+# ═════════════════════════════════════════════
+
+class SinistreArchiverView(APIView):
+    """
+    POST /api/sinistres/<pk>/archiver/
+
+    Seule l'Assurance peut archiver un sinistre clôturé.
+    Transition : CLOTURE → ARCHIVE
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAssurance]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        if sinistre.statut != 'CLOTURE':
+            return Response(
+                {'error': f"Seuls les sinistres clôturés peuvent être archivés. "
+                          f"Statut actuel : {sinistre.get_statut_display()}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ancien_statut = sinistre.statut
+        sinistre.statut = 'ARCHIVE'
+        sinistre.save()
+
+        _log_changement_statut(
+            sinistre, ancien_statut, 'ARCHIVE', request.user,
+            'Sinistre archivé.'
+        )
+
+        return Response(SinistreDetailSerializer(sinistre).data)
+
+
+# ═════════════════════════════════════════════
+#  EQUIPEMENT — CRUD (Ingénieur / Assurance)
+# ═════════════════════════════════════════════
+
+class EquipementListCreateView(APIView):
+    """
+    GET  /api/equipements/                       → Liste tous les équipements
+    GET  /api/sinistres/<pk>/equipements/         → Équipements d'un sinistre
+    POST /api/equipements/                        → Ajouter un équipement (Ingénieur)
+    """
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated(), IsIngenieurOrAssurance()]
+        return [permissions.IsAuthenticated()]
+
+    def get(self, request, sinistre_pk=None):
+        if sinistre_pk:
+            get_object_or_404(Sinistre, pk=sinistre_pk)
+            equipements = Equipement.objects.filter(sinistre_id=sinistre_pk)
+        else:
+            equipements = Equipement.objects.all()
+        return Response(EquipementSerializer(equipements, many=True).data)
+
+    @transaction.atomic
+    def post(self, request, sinistre_pk=None):
+        data = request.data.copy()
+        if sinistre_pk:
+            data['sinistre'] = sinistre_pk
+
+        serializer = EquipementSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class EquipementDetailView(APIView):
+    """
+    GET    /api/equipements/<pk>/
+    PUT    /api/equipements/<pk>/
+    DELETE /api/equipements/<pk>/
+    """
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'DELETE'):
+            return [permissions.IsAuthenticated(), IsIngenieurOrAssurance()]
+        return [permissions.IsAuthenticated()]
+
+    def get(self, request, pk):
+        equipement = get_object_or_404(Equipement, pk=pk)
+        return Response(EquipementSerializer(equipement).data)
+
+    @transaction.atomic
+    def put(self, request, pk):
+        equipement = get_object_or_404(Equipement, pk=pk)
+        serializer = EquipementSerializer(equipement, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        equipement = get_object_or_404(Equipement, pk=pk)
+        equipement.delete()
+        return Response(
+            {'message': 'Équipement supprimé.'},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+# ═════════════════════════════════════════════
+#  PIECE JOINTE — Upload & Gestion
+# ═════════════════════════════════════════════
+
+class PieceJointeListCreateView(APIView):
+    """
+    GET  /api/pieces/                           → Liste toutes les pièces
+    GET  /api/sinistres/<pk>/pieces/             → Pièces d'un sinistre
+    POST /api/pieces/                            → Upload d'une pièce jointe
+
+    Permissions :
+        - PHOTO_TERRAIN       → Équipe Terrain
+        - PV_POLICE           → Légal
+        - RAPPORT_HSE         → HSE
+        - RAPPORT_EXPERTISE   → Ingénieur
+        - DOCUMENT_ASSURANCE  → Assurance
+        - AUTRE               → Tout utilisateur authentifié
+    """
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, sinistre_pk=None):
+        if sinistre_pk:
+            get_object_or_404(Sinistre, pk=sinistre_pk)
+            pieces = PieceJointe.objects.filter(sinistre_id=sinistre_pk)
+        else:
+            pieces = PieceJointe.objects.all()
+        return Response(PieceJointeSerializer(pieces, many=True).data)
+
+    @transaction.atomic
+    def post(self, request, sinistre_pk=None):
+        data = request.data.copy()
+        if sinistre_pk:
+            data['sinistre'] = sinistre_pk
+
+        serializer = PieceJointeSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save(uploadePar=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PieceJointeDetailView(APIView):
+    """
+    GET    /api/pieces/<pk>/
+    DELETE /api/pieces/<pk>/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        piece = get_object_or_404(PieceJointe, pk=pk)
+        return Response(PieceJointeSerializer(piece).data)
+
+    def delete(self, request, pk):
+        piece = get_object_or_404(PieceJointe, pk=pk)
+
+        # Seul l'uploader, l'assurance ou l'admin peut supprimer
+        user = request.user
+        if not (piece.uploadePar == user or hasattr(user, 'assurance')
+                or user.is_staff or user.is_superuser):
+            return Response(
+                {'error': "Vous n'avez pas la permission de supprimer cette pièce."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        piece.fichier.delete(save=False)  # Supprimer le fichier physique
+        piece.delete()
+        return Response(
+            {'message': 'Pièce jointe supprimée.'},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+# ═════════════════════════════════════════════
+#  HISTORIQUE STATUT (lecture seule)
+# ═════════════════════════════════════════════
+
+class HistoriqueStatutListView(APIView):
+    """
+    GET /api/sinistres/<pk>/historique/
+    Retourne le journal complet des changements de statut d'un sinistre.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        get_object_or_404(Sinistre, pk=pk)
+        historique = HistoriqueStatut.objects.filter(sinistre_id=pk)
+        return Response(HistoriqueStatutSerializer(historique, many=True).data)
+
+
+# ═════════════════════════════════════════════
+#  STATISTIQUES (Dashboard)
+# ═════════════════════════════════════════════
+
+class StatistiquesView(APIView):
+    """
+    GET /api/statistiques/
+    Retourne les compteurs globaux pour le tableau de bord.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Count, Sum
+
+        total = Sinistre.objects.count()
+        par_statut = dict(
+            Sinistre.objects.values_list('statut')
+            .annotate(count=Count('idSinistre'))
+            .values_list('statut', 'count')
+        )
+        par_nature = dict(
+            Sinistre.objects.values_list('nature')
+            .annotate(count=Count('idSinistre'))
+            .values_list('nature', 'count')
+        )
+        montant_total = Sinistre.objects.aggregate(
+            total=Sum('montantEstime')
+        )['total'] or 0
+
+        return Response({
+            'totalSinistres':       total,
+            'enAttente':            par_statut.get('OUVERT', 0),
+            'enExpertise':          par_statut.get('EN_EXPERTISE', 0),
+            'transmisAssureur':     par_statut.get('TRANSMIS_ASSUREUR', 0),
+            'valides':              par_statut.get('VALIDE', 0),
+            'rejetes':              par_statut.get('REJETE', 0),
+            'clotures':             par_statut.get('CLOTURE', 0),
+            'archives':             par_statut.get('ARCHIVE', 0),
+            'parNature':            par_nature,
+            'montantTotalEstime':   montant_total,
+        })

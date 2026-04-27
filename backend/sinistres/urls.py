@@ -1,34 +1,90 @@
+"""
+sinistres/urls.py
+─────────────────
+URL patterns pour le module sinistres.
+Tous les endpoints sont préfixés par /api/ (configuré dans core/urls.py).
+"""
+
 from django.urls import path
 from . import views
 
+app_name = 'sinistres'
+
 urlpatterns = [
-    # Référentiel
-    path('natures/', views.nature_list, name='nature_list'),
-    path('natures/<str:nature_code>/types/', views.types_par_nature, name='types_par_nature'),
 
-    # Site
-    path('sites/', views.site_list, name='site_list'),
-    path('sites/<int:pk>/', views.site_detail, name='site_detail'),
-    # Sinistres
-    path('sinistres/', views.sinistre_list, name='sinistre_list'),
-    path('sinistres/<str:pk>/', views.sinistre_detail, name='sinistre_detail'),
-    path('sinistres/<str:pk>/estimation/', views.sinistre_update_estimation, name='sinistre_update_estimation'),
-    path('sinistres/<str:pk>/details/', views.sinistre_details_complets, name='sinistre_details_complets'),
-    path('sinistres/<str:pk>/equipements/', views.sinistre_equipements, name='sinistre_equipements'),
-    path('sinistres/<str:pk>/pieces/', views.sinistre_pieces, name='sinistre_pieces'),
-    # Déclaration
-    path('declarations/', views.declaration_list, name='declaration_list'),
-    path('declarations/<str:pk>/', views.declaration_detail, name='declaration_detail'),
-    path('declarations/<str:pk>/changer-etat/', views.declaration_changer_etat, name='declaration_changer_etat'),
-    path('declarations/<str:pk>/temps/', views.declaration_temps_traitement, name='declaration_temps_traitement'),
+    # ── Constantes globales ──
+    path('constants/',
+         views.ConstantsView.as_view(),
+         name='constants'),
 
-    # Équipement
-    path('equipements/', views.equipement_list, name='equipement_list'),
-    path('equipements/<str:pk>/', views.equipement_detail, name='equipement_detail'),
-    path('equipements/<str:pk>/garantie/', views.equipement_garantie, name='equipement_garantie'),
+    # ── Sites ──
+    path('sites/',
+         views.SiteListCreateView.as_view(),
+         name='site-list-create'),
+    path('sites/<str:pk>/',
+         views.SiteDetailView.as_view(),
+         name='site-detail'),
 
-    # Pieces Jointe
-    path('pieces/', views.piecejointe_list, name='piecejointe_list'),
-    path('pieces/<int:pk>/', views.piecejointe_detail, name='piecejointe_detail'),
-    path('pieces/<int:pk>/telecharger/', views.piecejointe_telecharger, name='piecejointe_telecharger'),
+    # ── Sinistres — CRUD ──
+    path('sinistres/',
+         views.SinistreListCreateView.as_view(),
+         name='sinistre-list-create'),
+    path('sinistres/<str:pk>/',
+         views.SinistreDetailView.as_view(),
+         name='sinistre-detail'),
+
+    # ── Sinistres — Workflow ──
+    path('sinistres/<str:pk>/expertise/',
+         views.SinistreExpertiseView.as_view(),
+         name='sinistre-expertise'),
+    path('sinistres/<str:pk>/validation/',
+         views.SinistreValidationAssuranceView.as_view(),
+         name='sinistre-validation'),
+    path('sinistres/<str:pk>/validation-legal/',
+         views.SinistreValidationLegalView.as_view(),
+         name='sinistre-validation-legal'),
+    path('sinistres/<str:pk>/validation-hse/',
+         views.SinistreValidationHSEView.as_view(),
+         name='sinistre-validation-hse'),
+    path('sinistres/<str:pk>/decision/',
+         views.SinistreDecisionView.as_view(),
+         name='sinistre-decision'),
+    path('sinistres/<str:pk>/cloturer/',
+         views.SinistreCloturerView.as_view(),
+         name='sinistre-cloturer'),
+    path('sinistres/<str:pk>/archiver/',
+         views.SinistreArchiverView.as_view(),
+         name='sinistre-archiver'),
+
+    # ── Sinistres — Relations imbriquées ──
+    path('sinistres/<str:sinistre_pk>/equipements/',
+         views.EquipementListCreateView.as_view(),
+         name='sinistre-equipements'),
+    path('sinistres/<str:sinistre_pk>/pieces/',
+         views.PieceJointeListCreateView.as_view(),
+         name='sinistre-pieces'),
+    path('sinistres/<str:pk>/historique/',
+         views.HistoriqueStatutListView.as_view(),
+         name='sinistre-historique'),
+
+    # ── Équipements — CRUD global ──
+    path('equipements/',
+         views.EquipementListCreateView.as_view(),
+         name='equipement-list-create'),
+    path('equipements/<str:pk>/',
+         views.EquipementDetailView.as_view(),
+         name='equipement-detail'),
+
+    # ── Pièces Jointes — CRUD global ──
+    path('pieces/',
+         views.PieceJointeListCreateView.as_view(),
+         name='piece-list-create'),
+    path('pieces/<int:pk>/',
+         views.PieceJointeDetailView.as_view(),
+         name='piece-detail'),
+
+    # ── Statistiques (Dashboard) ──
+    path('statistiques/',
+         views.StatistiquesView.as_view(),
+         name='statistiques'),
 ]

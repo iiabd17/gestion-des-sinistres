@@ -1,5 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import AsyncSelect from 'react-select/async'
+import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './NewDeclaration.css'
 
@@ -80,10 +83,43 @@ export default function NewDeclaration() {
   const [time, setTime]        = useState('')
   const [repairTime, setRepairTime] = useState('')
   const [code, setCode]        = useState('')
+  const [selectedSite, setSelectedSite] = useState(null)
   const [desc, setDesc]        = useState('')
   const [address, setAddress]  = useState('')
+  const [wilaya, setWilaya]    = useState('')
   const [files, setFiles]      = useState([])
   const [dragging, setDragging] = useState(false)
+  const [loading, setLoading]   = useState(false)
+
+  // ── Autocomplete : charger les sites depuis l'API ──
+  const loadSiteOptions = useCallback((inputValue) => {
+    if (!inputValue || inputValue.length < 1) {
+      return Promise.resolve([])
+    }
+    return api.get(`/sites/?search=${encodeURIComponent(inputValue)}`)
+      .then(res => {
+        return res.data.map(site => ({
+          value: site.codeSite,
+          label: `${site.codeSite} — ${site.nomSite} (${site.wilaya})`,
+          site: site, // on stocke l'objet complet pour l'auto-fill
+        }))
+      })
+      .catch(() => [])
+  }, [])
+
+  // ── Auto-fill quand un site est sélectionné ──
+  const handleSiteChange = (option) => {
+    setSelectedSite(option)
+    if (option) {
+      setCode(option.value)
+      setAddress(option.site.adresseSite || '')
+      setWilaya(option.site.wilaya || '')
+    } else {
+      setCode('')
+      setAddress('')
+      setWilaya('')
+    }
+  }
 
   const handleFiles = (incoming) => {
     const arr = Array.from(incoming).filter(f =>
@@ -98,10 +134,89 @@ export default function NewDeclaration() {
     handleFiles(e.dataTransfer.files)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // TODO: POST to backend
-    navigate('/dashboard')
+    
+    // Validation basique
+    if (!type || !date || !code || !desc) {
+      toast.error('Veuillez remplir tous les champs obligatoires.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Retrouver la nature à partir du type
+      const category = incidentCategories.find(cat => cat.types.some(t => t.value === type));
+      
+      // Mappage des types frontend vers Backend (qui utilisent parfois des codes spécifiques)
+      let natureVal = '';
+      if (category) {
+        // Un mapping simple basé sur la catégorie du frontend vers le backend NATURE_CHOICES
+        const natureMap = {
+          'Fibre Optique': 'FIBRE_OPTIQUE',
+          'Acte de Sabotage': 'ACTE_DE_SABOTAGE',
+          'Vol': 'VOL',
+          'Incendie': 'INCENDIE',
+          'Intempérie': 'INTEMPERIE',
+          'Catastrophe Naturelle': 'CATASTROPHE_NATUREL',
+          'Violence Politique': 'VIOLENCE_POLITIQUE',
+          'RC': 'RC'
+        };
+        natureVal = natureMap[category.nature] || category.nature;
+      }
+
+      // Génération d'un ID unique pour le sinistre
+      const idSinistre = `SIN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      const payload = {
+        idSinistre: idSinistre,
+        nature: natureVal,
+        typeSinistre: type,
+        dateSurvenance: date,
+        heureSurvenance: time || null,
+        descriptionDetailliee: desc,
+        codeSite: code,
+        urgence: 1 // Par défaut
+      };
+
+      // 1. Créer le sinistre
+      await api.post('/sinistres/', payload);
+
+      // 2. Uploader les fichiers si présents
+      if (files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const formData = new FormData();
+          formData.append('sinistre', idSinistre);
+          formData.append('titreDoc', file.name);
+          formData.append('fichier', file);
+          
+          // Déterminer le type de pièce selon le rôle serait l'idéal, par défaut PHOTO_TERRAIN
+          formData.append('typePiece', 'PHOTO_TERRAIN'); 
+
+          await api.post('/pieces/', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        }
+      }
+
+      toast.success('Déclaration de sinistre enregistrée avec succès !');
+      navigate('/dashboard');
+
+    } catch (err) {
+      console.error(err);
+      if (err.response && err.response.data) {
+        // Afficher la première erreur reçue
+        const firstErrorKey = Object.keys(err.response.data)[0];
+        const errorMessage = err.response.data[firstErrorKey];
+        toast.error(`Erreur: ${firstErrorKey} - ${Array.isArray(errorMessage) ? errorMessage[0] : errorMessage}`);
+      } else {
+        toast.error('Une erreur est survenue lors de la création du sinistre.');
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -249,18 +364,52 @@ export default function NewDeclaration() {
                   )}
 
                   <div className="nd-field nd-field--full">
-                    <label className="nd-field-label" htmlFor="nd-code">CODE DU SITE / LA STATION</label>
-                    <div className="nd-input-wrap">
-                      <svg className="nd-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      <input
-                        id="nd-code"
-                        type="text"
-                        className="nd-input"
-                        placeholder="Ex: DZ-AL-1024"
-                        value={code}
-                        onChange={e => setCode(e.target.value)}
-                      />
-                    </div>
+                    <label className="nd-field-label">CODE DU SITE / LA STATION</label>
+                    <AsyncSelect
+                      id="nd-code"
+                      cacheOptions
+                      defaultOptions={false}
+                      loadOptions={loadSiteOptions}
+                      onChange={handleSiteChange}
+                      value={selectedSite}
+                      placeholder="Tapez pour rechercher un site (ex: AL, BL, OR)..."
+                      noOptionsMessage={({ inputValue }) =>
+                        inputValue ? 'Aucun site trouvé' : 'Tapez au moins 1 caractère'
+                      }
+                      loadingMessage={() => 'Recherche...'}
+                      isClearable
+                      styles={{
+                        control: (base, state) => ({
+                          ...base,
+                          backgroundColor: '#F8F9FA',
+                          border: state.isFocused ? '1.5px solid #E2000F' : '1.5px solid #E2E8F0',
+                          borderRadius: '10px',
+                          padding: '4px 6px',
+                          fontSize: '0.95rem',
+                          boxShadow: state.isFocused ? '0 0 0 3px rgba(226,0,15,0.10)' : 'none',
+                          '&:hover': { borderColor: '#E2000F' },
+                          minHeight: '46px',
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isSelected ? '#E2000F' : state.isFocused ? '#FFF1F2' : '#fff',
+                          color: state.isSelected ? '#fff' : '#1E293B',
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                        }),
+                        placeholder: (base) => ({
+                          ...base,
+                          color: '#94A3B8',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          zIndex: 20,
+                        }),
+                      }}
+                    />
+                    <p className="nd-helper">TAPEZ LE CODE OU LE NOM DU SITE POUR LANCER LA RECHERCHE</p>
                   </div>
 
                   <div className="nd-field nd-field--full">
@@ -322,7 +471,7 @@ export default function NewDeclaration() {
                     style={{ cursor: 'pointer', textDecoration: 'underline' }}
                     title="Ouvrir Google Maps"
                   >
-                    ADRESSE OU POINT DE REPÈRE (Ouvrir sur la carte)
+                    ADRESSE (Auto-remplie)
                   </label>
                   <div className="nd-input-wrap nd-input-wrap--mt">
                     <svg className="nd-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -330,9 +479,26 @@ export default function NewDeclaration() {
                       id="nd-address"
                       type="text"
                       className="nd-input"
-                      placeholder="Entrez l'adresse précise..."
+                      placeholder="Sélectionnez un site pour remplir automatiquement..."
                       value={address}
-                      onChange={e => setAddress(e.target.value)}
+                      readOnly
+                      style={{ backgroundColor: '#F1F5F9', cursor: 'default' }}
+                    />
+                  </div>
+
+                  <label className="nd-field-label nd-field-label--sm" style={{ marginTop: '1rem' }}>
+                    WILAYA (Auto-remplie)
+                  </label>
+                  <div className="nd-input-wrap nd-input-wrap--mt">
+                    <svg className="nd-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l8-4 8 4v14M9 21v-6h6v6"/></svg>
+                    <input
+                      id="nd-wilaya"
+                      type="text"
+                      className="nd-input"
+                      placeholder="Sélectionnez un site..."
+                      value={wilaya}
+                      readOnly
+                      style={{ backgroundColor: '#F1F5F9', cursor: 'default' }}
                     />
                   </div>
                 </section>
@@ -413,9 +579,15 @@ export default function NewDeclaration() {
 
                 {/* Actions */}
                 <div className="nd-actions">
-                  <button type="submit" id="btn-submit-declaration" className="nd-submit-btn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    Soumettre la Déclaration
+                  <button type="submit" id="btn-submit-declaration" className="nd-submit-btn" disabled={loading}>
+                    {loading ? (
+                      'Soumission...'
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        Soumettre la Déclaration
+                      </>
+                    )}
                   </button>
                   <button
                     type="button"
