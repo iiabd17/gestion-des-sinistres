@@ -31,9 +31,7 @@ export default function Sidebar() {
     <aside className="sb-sidebar">
       {/* Brand */}
       <div className="sb-brand">
-        <svg className="sb-brand-icon" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-          <polygon points="6,4 36,20 6,36" fill="#E2000F" />
-        </svg>
+        <img src="/logo.png" alt="Djezzy" className="sb-brand-icon" />
         <span className="sb-brand-name">DJEZZY</span>
       </div>
 

@@ -39,6 +39,7 @@
   cursor: pointer; color: #718096; position: relative;
   transition: all .2s;
 }
+.gd-icon-btn svg { width: 20px; height: 20px; }
 .gd-icon-btn:hover { background: #f7fafc; color: #E2000F; border-color: #ffdada; }
 
 /* ── Content ────────────────────────────────────────── */
@@ -87,7 +88,9 @@
   gap: 8px;
   cursor: pointer;
   transition: all .2s;
+  white-space: nowrap;
 }
+.gd-btn-white svg { width: 16px; height: 16px; flex-shrink: 0; }
 .gd-btn-white:hover { border-color: #cbd5e0; background: #f7fafc; }
 
 .gd-btn-red {
@@ -104,7 +107,9 @@
   cursor: pointer;
   transition: all .2s;
   box-shadow: 0 4px 12px rgba(226, 0, 15, 0.2);
+  white-space: nowrap;
 }
+.gd-btn-red svg { width: 16px; height: 16px; flex-shrink: 0; }
 .gd-btn-red:hover { background: #c0000c; transform: translateY(-1px); }
 
 /* Filters Card */
@@ -252,11 +257,13 @@
   display: flex; align-items: center; justify-content: center;
   border-radius: 8px;
   color: #E2000F;
-  border: 1px solid transparent;
+  background: #fff;
+  border: 1px solid #fecaca;
   cursor: pointer;
   transition: all .2s;
 }
-.gd-action-view:hover { background: #fff5f5; border-color: #fed7d7; }
+.gd-action-view svg { width: 18px; height: 18px; }
+.gd-action-view:hover { background: #fff5f5; border-color: #E2000F; }
 
 /* Pagination */
 .gd-pagination {
