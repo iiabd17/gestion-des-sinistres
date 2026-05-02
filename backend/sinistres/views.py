@@ -92,6 +92,21 @@ class IsAnyAuthenticated(permissions.BasePermission):
         )
 
 
+class CanDeclare(permissions.BasePermission):
+    """Tout utilisateur authentifié et actif SAUF HSE et Légal."""
+    message = "Les services HSE et Légal ne peuvent pas créer de déclarations."
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        # Refuser HSE et Légal
+        if hasattr(request.user, 'hse') or hasattr(request.user, 'legal'):
+            return False
+        return True
+
+
 class IsEquipeTerrainOrAssurance(permissions.BasePermission):
     """Équipe Terrain OU Assurance (pour la création de sinistre)."""
     def has_permission(self, request, view):
@@ -353,7 +368,7 @@ class SinistreListCreateView(APIView):
     """
     def get_permissions(self):
         if self.request.method == 'POST':
-            return [permissions.IsAuthenticated(), IsEquipeTerrain()]
+            return [permissions.IsAuthenticated(), CanDeclare()]
         return [permissions.IsAuthenticated()]
 
     def get(self, request):
@@ -462,6 +477,11 @@ class SinistreDetailView(APIView):
             'descriptionDetailliee', 'montantEstime', 'urgence',
             'heureSurvenance',
         ]
+        
+        # Admin et Assurance peuvent forcer le changement de statut
+        if is_assur or is_admin:
+            allowed_fields.append('statut')
+
         update_data = {k: v for k, v in request.data.items() if k in allowed_fields}
 
         for field, value in update_data.items():
