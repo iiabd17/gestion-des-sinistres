@@ -21,12 +21,13 @@ const STATUT_OPTIONS = [
 
 export default function StatistiquesDelaisPage() {
   const [selectedStatut, setSelectedStatut] = useState('EN_EXPERTISE');
+  const [periode, setPeriode] = useState('tout');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    api.get(`/stats/delais-detail/?statut=${selectedStatut}`)
+    api.get(`/stats/delais-detail/?statut=${selectedStatut}&periode=${periode}`)
       .then(res => {
         setData(res.data);
       })
@@ -68,6 +69,28 @@ export default function StatistiquesDelaisPage() {
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
+
+            <label htmlFor="periode-select" style={{ marginRight: '1rem', marginLeft: '2rem', fontWeight: 500, color: '#334155' }}>
+              Période :
+            </label>
+            <select
+              id="periode-select"
+              value={periode}
+              onChange={(e) => setPeriode(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                outline: 'none',
+                minWidth: '150px',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="tout">Tout l'historique</option>
+              <option value="annee">Cette année</option>
+              <option value="mois">Ce mois</option>
+              <option value="semaine">Cette semaine</option>
+            </select>
           </div>
         </header>
 
@@ -80,7 +103,7 @@ export default function StatistiquesDelaisPage() {
               <StatCard title="Dossiers concernés" value={data.total_dossiers} color="#3B82F6" />
               <StatCard title="Temps Moyen (Heures)" value={data.moyenne_heures} color="#8B5CF6" />
               <StatCard title="Temps Maximum (Heures)" value={data.max_heures} color="#E2000F" />
-              <StatCard title="Temps Minimum (Heures)" value={data.min_heures} color="#10B981" />
+              <StatCard title="Temps Minimum (Heures)" value={data.min_heures > 0 && data.min_heures < 1 ? "< 1" : data.min_heures} color="#10B981" />
             </div>
 
             {/* Graphique détaillé */}

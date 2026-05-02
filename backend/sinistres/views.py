@@ -1407,8 +1407,20 @@ class StatistiquesDelaisDetailView(APIView):
         from django.utils import timezone
         
         statut_cible = request.query_params.get('statut')
+        periode = request.query_params.get('periode', 'tout')
+        
         if not statut_cible:
             return Response({"error": "Le paramètre 'statut' est requis."}, status=400)
+            
+        now = timezone.now()
+        from datetime import timedelta
+        date_limite = None
+        if periode == 'semaine':
+            date_limite = now - timedelta(days=7)
+        elif periode == 'mois':
+            date_limite = now - timedelta(days=30)
+        elif periode == 'annee':
+            date_limite = now - timedelta(days=365)
             
         historiques = HistoriqueStatut.objects.all().order_by('sinistre_id', 'dateChangement').select_related('sinistre')
         
@@ -1446,6 +1458,10 @@ class StatistiquesDelaisDetailView(APIView):
                     'date_entree': h.dateChangement,
                     'date_sortie': None
                 })
+                
+        # Filtrer par date d'entrée si une période est sélectionnée
+        if date_limite:
+            resultats = [r for r in resultats if r['date_entree'] >= date_limite]
                 
         # Tri du plus long au plus court
         resultats.sort(key=lambda x: x['duree_heures'], reverse=True)
