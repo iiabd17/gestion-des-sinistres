@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { AuthContext } from '../../../context/AuthContext'
 import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
+import AssuranceDashboardStats from './AssuranceDashboardStats'
 import './Dashboard.css'
 
 /* ── Statut badge mapping ─────────────────────────────── */
@@ -101,6 +102,9 @@ export default function Dashboard() {
               }
             </p>
           </div>
+
+          {/* Section spécifique Assurance */}
+          {user?.role === 'ASSURANCE' && <AssuranceDashboardStats />}
 
           {/* stat cards */}
           <div className="db-stats">

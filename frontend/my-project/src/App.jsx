@@ -17,6 +17,7 @@ import ArchivesPage from './Pages/Archives/ArchivesPage';
 import SettingsPage from './Pages/Settings/SettingsPage';
 import ProfilePage from './Pages/Profile/ProfilePage';
 import NotificationsPage from './Pages/Notifications/NotificationsPage';
+import StatistiquesDelaisPage from './Pages/Statistiques/StatistiquesDelaisPage';
 
 function App() {
   return (
@@ -55,6 +56,11 @@ function App() {
           {/* Routes Archives */}
           <Route element={<ProtectedRoute allowedRoles={['LEGAL', 'ASSURANCE', 'ADMIN', 'HSE']} />}>
             <Route path="/archives" element={<ArchivesPage />} />
+          </Route>
+
+          {/* Routes Statistiques (Assurance / Admin) */}
+          <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'ADMIN']} />}>
+            <Route path="/statistiques-delais" element={<StatistiquesDelaisPage />} />
           </Route>
 
           {/* Routes Paramètres (Directrice Assurance / Admin / Ingénieur pour Équipements) */}
