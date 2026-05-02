@@ -101,6 +101,9 @@ class CanDeclare(permissions.BasePermission):
             return False
         if not getattr(request.user, 'estActif', False):
             return False
+        # Admin bypass — full access
+        if request.user.is_staff or request.user.is_superuser:
+            return True
         # Refuser HSE et Légal
         if hasattr(request.user, 'hse') or hasattr(request.user, 'legal'):
             return False
@@ -456,17 +459,23 @@ class SinistreDetailView(APIView):
         return Response(SinistreDetailSerializer(sinistre).data)
 
     @transaction.atomic
+    def patch(self, request, pk):
+        return self.put(request, pk)
+
+    @transaction.atomic
     def put(self, request, pk):
         sinistre = get_object_or_404(Sinistre, pk=pk)
 
-        # Seul le créateur, un ingénieur, ou l'assurance peut modifier
+        # Seul le créateur, un ingénieur, l'assurance, legal ou HSE peut modifier
         user = request.user
         is_creator  = sinistre.createur == user
         is_ing      = hasattr(user, 'ingenieur')
         is_assur    = hasattr(user, 'assurance')
+        is_legal    = hasattr(user, 'legal')
+        is_hse      = hasattr(user, 'hse')
         is_admin    = user.is_staff or user.is_superuser
 
-        if not (is_creator or is_ing or is_assur or is_admin):
+        if not (is_creator or is_ing or is_assur or is_admin or is_legal or is_hse):
             return Response(
                 {'error': "Vous n'avez pas la permission de modifier ce sinistre."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -475,7 +484,8 @@ class SinistreDetailView(APIView):
         # Champs modifiables selon le statut
         allowed_fields = [
             'descriptionDetailliee', 'montantEstime', 'urgence',
-            'heureSurvenance',
+            'heureSurvenance', 'numeroPV', 'observationsLegal',
+            'observationsHSE', 'mesuresCorrectives',
         ]
         
         # Admin et Assurance peuvent forcer le changement de statut
@@ -558,6 +568,59 @@ class SinistreExpertiseView(APIView):
         directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
         lien = f"/gestion/{sinistre.idSinistre}"
         _create_notification(directeurs_assurance, f"Expertise terminée pour {sinistre.idSinistre}. Le dossier est prêt pour la validation finale.", lien)
+
+        return Response(SinistreDetailSerializer(sinistre).data)
+
+
+# ═════════════════════════════════════════════
+#  WORKFLOW : Retour à compléter (Assurance → Ingénieur)
+# ═════════════════════════════════════════════
+
+class SinistreRetourCompletionView(APIView):
+    """
+    POST /api/sinistres/<pk>/retour-completion/
+
+    L'assurance (ou admin) renvoie un dossier à l'ingénieur pour complétion.
+    Transition : EN_EXPERTISE → OUVERT
+
+    Body JSON :
+    {
+        "motif": "Informations manquantes sur les équipements"
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAssurance]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        if sinistre.statut not in ('EN_EXPERTISE', 'EN_VALIDATION'):
+            return Response(
+                {'error': f"Ce sinistre est en statut '{sinistre.get_statut_display()}'. "
+                          f"Le retour n'est possible que pour les sinistres EN EXPERTISE ou EN VALIDATION."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ancien_statut = sinistre.statut
+        motif = request.data.get('motif', 'Informations manquantes')
+
+        sinistre.statut = 'OUVERT'
+        sinistre.save()
+
+        _log_changement_statut(
+            sinistre, ancien_statut, 'OUVERT', request.user,
+            f'Dossier renvoyé pour complétion : {motif}'
+        )
+
+        # Notifier tous les ingénieurs
+        from accounts.models import Ingenieur
+        ingenieurs = Ingenieur.objects.all()
+        lien = f"/declarations/completer/{sinistre.idSinistre}"
+        _create_notification(
+            ingenieurs,
+            f"Dossier {sinistre.idSinistre} renvoyé pour complétion : {motif}",
+            lien
+        )
 
         return Response(SinistreDetailSerializer(sinistre).data)
 

@@ -1,183 +1,234 @@
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import jsPDF from 'jspdf'
+import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './DossierValidation.css'
+import './DossierCompleterDetail.css'
 
-/* ── Mock data (keyed by dossier id) ─────────────────── */
-const dossiers = {
-  'RZY-2023-6642': {
-    site: 'Algiers – Hydra', date: '14 Oct 2023', nature: 'Incendie',
-    declarant: { nom: 'Amine Belkacem', emploi: 'DZ-99421', tel: '+213 798 12 34 56', dept: 'Équipe Terrain – Zone Sud' },
-    description: 'Pôle technologique Hydra, Bâtiment B. Station de base macro-site indoor. Équipement de transmission principal.',
-    gps: '35.7416° N,  3.0371° E',
-    equipements: [
-      { Icon: IconRouter,  label: 'Routeurs Cisco 9k',     qty: '2x',   val: '320,000 DZD' },
-      { Icon: IconCable,   label: 'Câbles Fibre Optique',  qty: '100m', val: '45,000 DZD'  },
-      { Icon: IconBattery, label: 'Unité Batterie UPS',    qty: '1x',   val: '85,000 DZD'  },
-    ],
-    total: '450,000 DZD',
-    fichiers: 8,
-  },
-  'RZY-2023-8911': {
-    site: 'Oran-Center', date: '15 Oct 2023', nature: "Dégâts des eaux",
-    declarant: { nom: 'Karim Mansouri', emploi: 'DZ-88302', tel: '+213 770 45 67 89', dept: 'Équipe Terrain – Zone Ouest' },
-    description: "Centre de commutation principal d'Oran. Inondation du sous-sol suite à de fortes pluies. Matériel de réseau endommagé.",
-    gps: '35.6969° N, -0.6330° W',
-    equipements: [
-      { Icon: IconRouter,  label: 'Switch Cisco Catalyst', qty: '3x',   val: '75,000 DZD' },
-      { Icon: IconCable,   label: 'Câblage réseau',        qty: '200m', val: '18,000 DZD' },
-      { Icon: IconBattery, label: 'Onduleur APC',          qty: '2x',   val: '27,500 DZD' },
-    ],
-    total: '120,500 DZD',
-    fichiers: 5,
-  },
-  'RZY-2023-1064': {
-    site: 'Constantine', date: '18 Oct 2023', nature: 'Vol Équipement',
-    declarant: { nom: 'Salah Benali', emploi: 'DZ-76120', tel: '+213 661 23 45 67', dept: 'Sécurité – Zone Est' },
-    description: 'Site BTS Constantine-Nord. Vol de matériel de transmission lors du weekend. Effraction signalée au niveau du local technique.',
-    gps: '36.3650° N, 6.6147° E',
-    equipements: [
-      { Icon: IconRouter,  label: 'Émetteur-récepteur',    qty: '4x',   val: '640,000 DZD' },
-      { Icon: IconCable,   label: 'Câbles coaxiaux',       qty: '50m',  val: '12,000 DZD'  },
-      { Icon: IconBattery, label: 'Batteries lithium',     qty: '8x',   val: '238,000 DZD' },
-    ],
-    total: '890,000 DZD',
-    fichiers: 3,
-  },
-  'RZY-2023-1122': {
-    site: 'Setif–Industrial', date: '20 Oct 2023', nature: 'Accident',
-    declarant: { nom: 'Houda Cherif', emploi: 'DZ-91034', tel: '+213 699 87 65 43', dept: 'Maintenance – Zone Centre' },
-    description: "Zone industrielle de Sétif, pylône P-12. Accident de véhicule ayant endommagé la structure support d'antennes.",
-    gps: '36.1898° N, 5.4114° E',
-    equipements: [
-      { Icon: IconRouter,  label: 'Antenne sectorielle',   qty: '2x',   val: '38,000 DZD' },
-      { Icon: IconCable,   label: 'Câblage alimentation',  qty: '30m',  val: '9,000 DZD'  },
-      { Icon: IconBattery, label: 'Boîtier de protection', qty: '1x',   val: '18,000 DZD' },
-    ],
-    total: '65,000 DZD',
-    fichiers: 6,
-  },
-}
-
-const natureStyle = {
-  'Incendie':         { bg: '#fef9c3', color: '#a16207' },
-  "Dégâts des eaux":  { bg: '#dbeafe', color: '#1d4ed8' },
-  'Vol Équipement':   { bg: '#ede9fe', color: '#7c3aed' },
-  'Accident':         { bg: '#d1fae5', color: '#065f46' },
+const NATURE_STYLES = {
+  'INCENDIE':            { bg: '#fef9c3', color: '#a16207' },
+  'VOL':                 { bg: '#ede9fe', color: '#7c3aed' },
+  'ACTE_DE_SABOTAGE':    { bg: '#ede9fe', color: '#7c3aed' },
+  'FIBRE_OPTIQUE':       { bg: '#dbeafe', color: '#1d4ed8' },
+  'INTEMPERIE':          { bg: '#dbeafe', color: '#1d4ed8' },
+  'CATASTROPHE_NATUREL': { bg: '#fee2e2', color: '#b91c1c' },
+  'VIOLENCE_POLITIQUE':  { bg: '#fce7f3', color: '#be185d' },
+  'RC':                  { bg: '#d1fae5', color: '#065f46' },
 }
 
 export default function DossierValidation() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  /* Normalise the id - URL uses the raw id like RZY-2023-6642 */
-  const data = dossiers[id] || dossiers['RZY-2023-6642']
-  const ns   = natureStyle[data.nature] || { bg: '#f0f0f0', color: '#555' }
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleInfoManquante = () => {
+  useEffect(() => {
+    setLoading(true)
+    api.get(`/sinistres/${id}/`)
+      .then(res => setData(res.data))
+      .catch(() => toast.error('Erreur lors du chargement du dossier'))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  // Validate → transition status so it leaves "à valider" and goes to gestion
+  const handleValider = useCallback(async () => {
+    setSubmitting(true)
     try {
-      const savedValider = JSON.parse(localStorage.getItem('dossiersValider') || '[]');
-      const savedCompleter = JSON.parse(localStorage.getItem('dossiersCompleter') || '[]');
-      
-      const dossierIndex = savedValider.findIndex(d => d.id.includes(id));
-      if (dossierIndex !== -1) {
-        const movedDossier = savedValider.splice(dossierIndex, 1)[0];
-        savedCompleter.unshift({
-          id: movedDossier.id,
-          site: movedDossier.site,
-          ville: movedDossier.ville || 'À préciser',
-          date: movedDossier.date,
-          nature: movedDossier.nature,
-          statut: 'EN ATTENTE'
-        });
-        
-        localStorage.setItem('dossiersValider', JSON.stringify(savedValider));
-        localStorage.setItem('dossiersCompleter', JSON.stringify(savedCompleter));
-      }
-    } catch (e) {
-      console.error(e);
+      await api.post(`/sinistres/${id}/validation/`, {
+        action: 'VALIDER',
+        commentaire: 'Dossier validé et transmis pour traitement.',
+      })
+      toast.success('Dossier validé et transmis à la gestion des dossiers')
+      navigate('/gestion')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Erreur lors de la validation')
+    } finally {
+      setSubmitting(false)
     }
-    navigate('/declarations', { state: { tab: 'completer' } });
+  }, [id, navigate])
+
+  // Send back to compléter (OUVERT) and notify ingénieur
+  const handleInfoManquante = useCallback(async () => {
+    setSubmitting(true)
+    try {
+      await api.post(`/sinistres/${id}/retour-completion/`, {
+        motif: 'Informations manquantes — dossier renvoyé pour complétion.',
+      })
+      toast.success('Dossier renvoyé pour complétion. L\'ingénieur a été notifié.')
+      navigate('/declarations', { state: { tab: 'completer' } })
+    } catch (err) {
+      if (err.response?.status === 403) {
+        toast.error("Vous n'avez pas la permission d'effectuer cette action.")
+      } else {
+        toast.error(err.response?.data?.error || 'Erreur lors du retour pour complétion')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }, [id, navigate])
+
+  const exportPDF = async () => {
+    try {
+      toast.info('Génération du PDF...')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      let y = 20
+
+      // Title
+      pdf.setFontSize(22); pdf.setTextColor(226, 0, 15)
+      pdf.text(`Dossier Sinistre: #${id}`, 20, y); y += 10
+      pdf.setFontSize(11); pdf.setTextColor(113, 128, 150)
+      pdf.text(`Déclaré le : ${new Date(data.dateCreation).toLocaleDateString('fr-FR')}`, 20, y); y += 15
+
+      // Declarant
+      pdf.setFontSize(16); pdf.setTextColor(26, 32, 44)
+      pdf.text("Informations du Déclarant", 20, y); y += 10
+      pdf.setFontSize(12); pdf.setTextColor(74, 85, 104)
+      const decl = data.createur_detail || {}
+      const declInfos = [
+        `Nom : ${decl.nom_complet || data.createur_nom || 'N/A'}`,
+        `Matricule : ${decl.matricule || decl.username || 'N/A'}`,
+        `Téléphone : ${decl.tel || 'N/A'}`,
+        `Département : ${decl.departement || decl.fonction || 'N/A'}`,
+      ]
+      declInfos.forEach(info => { pdf.text(info, 20, y); y += 7 })
+      y += 5
+
+      // Incident info
+      pdf.setFontSize(16); pdf.setTextColor(26, 32, 44)
+      pdf.text("Informations de l'incident", 20, y); y += 10
+      pdf.setFontSize(12); pdf.setTextColor(74, 85, 104)
+      const infos = [
+        `Type : ${data.nature_label || ''}`,
+        `Date : ${new Date(data.dateSurvenance).toLocaleDateString('fr-FR')}`,
+        `Site : ${data.site_detail?.wilaya || ''} – ${data.site_detail?.nomSite || ''} (${data.site_detail?.codeSite || ''})`,
+        `Statut : ${data.statut_label || data.statut || ''}`,
+      ]
+      if (data.descriptionDetailliee) infos.push(`Description : ${data.descriptionDetailliee.substring(0, 120)}`)
+      infos.forEach(info => { pdf.text(info, 20, y); y += 7 })
+      y += 5
+
+      // Equipment
+      const equips = data.equipements || []
+      if (equips.length > 0) {
+        pdf.setFontSize(16); pdf.setTextColor(26, 32, 44)
+        pdf.text("Équipements Sinistrés", 20, y); y += 10
+        pdf.setFontSize(11); pdf.setTextColor(74, 85, 104)
+        equips.forEach(eq => {
+          pdf.text(`• ${eq.nomMarque}  —  ${eq.quantiteImpactee}x  —  ${parseFloat(eq.valeurComptable || 0).toLocaleString('fr-FR')} DZD`, 22, y)
+          y += 7
+        })
+        const total = equips.reduce((s, e) => s + (parseFloat(e.valeurComptable) || 0) * (e.quantiteImpactee || 1), 0)
+        pdf.setFontSize(13); pdf.setTextColor(226, 0, 15)
+        pdf.text(`Total Estimé : ${total.toLocaleString('fr-FR')} DZD`, 20, y); y += 12
+      }
+
+      // Images
+      const imagePieces = (data.piecesJointes || []).filter(p => p.fichier && /\.(jpg|jpeg|png)$/i.test(p.fichier))
+      for (const piece of imagePieces) {
+        try {
+          const imgUrl = piece.fichier.startsWith('http') ? piece.fichier : `http://localhost:8000${piece.fichier}`
+          const imgData = await new Promise((resolve, reject) => {
+            const img = new Image(); img.crossOrigin = 'Anonymous'
+            img.onload = () => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); resolve(c.toDataURL('image/jpeg', 0.8)) }
+            img.onerror = reject; img.src = imgUrl
+          })
+          if (y + 90 > 280) { pdf.addPage(); y = 20 }
+          pdf.addImage(imgData, 'JPEG', 20, y, 170, 80, undefined, 'FAST'); y += 90
+        } catch {}
+      }
+
+      pdf.save(`Dossier_${id}.pdf`)
+      toast.success('PDF téléchargé')
+    } catch { toast.error("Erreur lors de la génération du PDF") }
   }
+
+  if (loading) {
+    return (
+      <div className="dv-layout"><Sidebar />
+        <div className="dv-main dcd-center"><div className="dcd-spinner" /><p className="dcd-loading-text">Chargement du dossier...</p></div>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="dv-layout"><Sidebar />
+        <div className="dv-main dcd-center"><p className="dcd-error-text">Dossier introuvable</p></div>
+      </div>
+    )
+  }
+
+  const ns = NATURE_STYLES[data.nature] || { bg: '#f0f0f0', color: '#555' }
+  const declarant = data.createur_detail || {}
+  const site = data.site_detail || {}
+  const equipements = data.equipements || []
+  const pieces = data.piecesJointes || []
+  const gpsText = (site.latitude && site.longitude)
+    ? `${parseFloat(site.latitude).toFixed(4)}° N, ${parseFloat(site.longitude).toFixed(4)}° E`
+    : 'Non disponible'
+  const siteLabel = [site.wilaya, site.nomSite].filter(Boolean).join(' – ') || site.codeSite || 'N/A'
+  const dateLabel = data.dateSurvenance
+    ? new Date(data.dateSurvenance).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+    : ''
+  const statutLabel = data.statut_label?.toUpperCase() || data.statut
+  const totalEstime = equipements.length > 0
+    ? equipements.reduce((sum, e) => sum + (parseFloat(e.valeurComptable) || 0) * (e.quantiteImpactee || 1), 0)
+    : parseFloat(data.montantEstime) || 0
 
   return (
     <div className="dv-layout">
       <Sidebar />
 
       <div className="dv-main">
-        {/* Topbar */}
         <header className="dv-topbar">
           <div className="dv-topbar-actions">
-            <button className="dv-icon-btn" aria-label="Notifications">
-              <IconBell />
-              <span className="dv-notif-dot" />
-            </button>
-            <button className="dv-icon-btn" aria-label="Profil">
-              <IconUser />
-            </button>
+            <button className="dv-icon-btn" aria-label="Notifications"><IconBell /><span className="dv-notif-dot" /></button>
+            <button className="dv-icon-btn" aria-label="Profil"><IconUser /></button>
           </div>
         </header>
 
         <main className="dv-content">
-          {/* ── Page header ──────────────────────── */}
+          {/* Page header */}
           <div className="dv-page-header">
             <div className="dv-page-meta">
-              <span className="dv-eyebrow">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                DOSSIER EN RÉVISION
-              </span>
-              <span className="dv-eyebrow-id">#{id || 'RZY-2023-0842'}</span>
+              <span className="dv-eyebrow"><IconDocument />{statutLabel}</span>
+              <span className="dv-eyebrow-id">#{data.idSinistre}</span>
             </div>
             <div className="dv-header-row">
               <h1 className="dv-title">Validation du Dossier</h1>
               <div className="dv-chips">
-                <div className="dv-chip">
-                  <span className="dv-chip-label">SITE</span>
-                  <span className="dv-chip-val">{data.site}</span>
-                </div>
-                <div className="dv-chip">
-                  <span className="dv-chip-label">DATE</span>
-                  <span className="dv-chip-val">{data.date}</span>
-                </div>
+                <ChipItem label="SITE" value={siteLabel} />
+                <ChipItem label="DATE" value={dateLabel} />
                 <div className="dv-chip">
                   <span className="dv-chip-label">NATURE</span>
                   <span className="dv-chip-val dv-nature" style={{ background: ns.bg, color: ns.color }}>
                     <span className="dv-nature-dot" style={{ background: ns.color }} />
-                    {data.nature}
+                    {data.nature_label}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* ── Two-column body ──────────────────── */}
+          {/* Two-column body */}
           <div className="dv-body">
-
-            {/* LEFT ─────────────────────────────── */}
+            {/* LEFT */}
             <div className="dv-left">
-
-              {/* Informations du Déclarant */}
+              {/* Déclarant */}
               <section className="dv-card">
                 <div className="dv-card-title-row">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <IconUserCard />
                   <h2 className="dv-card-title">Informations du Déclarant</h2>
                 </div>
                 <div className="dv-info-grid">
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">NOM COMPLET</span>
-                    <span className="dv-info-val">{data.declarant.nom}</span>
-                  </div>
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">EMPLOI CD</span>
-                    <span className="dv-info-val">{data.declarant.emploi}</span>
-                  </div>
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">NUMÉRO DE TÉLÉPHONE</span>
-                    <span className="dv-info-val">{data.declarant.tel}</span>
-                  </div>
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">DÉPARTEMENT</span>
-                    <span className="dv-info-val">{data.declarant.dept}</span>
-                  </div>
+                  <InfoField label="NOM COMPLET" value={declarant.nom_complet || data.createur_nom} />
+                  <InfoField label="EMPLOI CD" value={declarant.matricule || declarant.username} />
+                  <InfoField label="NUMÉRO DE TÉLÉPHONE" value={declarant.tel} />
+                  <InfoField label="DÉPARTEMENT" value={declarant.departement || declarant.fonction} />
                 </div>
               </section>
 
@@ -187,73 +238,63 @@ export default function DossierValidation() {
                 <div className="dv-tech-grid">
                   <div className="dv-info-field">
                     <span className="dv-info-label">DESCRIPTION DU SITE</span>
-                    <p className="dv-info-desc">{data.description}</p>
+                    <p className="dv-info-desc">{data.descriptionDetailliee || 'Aucune description fournie.'}</p>
                   </div>
                   <div className="dv-info-field">
                     <span className="dv-info-label">COORDONNÉES GPS</span>
-                    <div className="dv-gps-val">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      {data.gps}
-                    </div>
+                    <div className="dv-gps-val"><IconPin />{gpsText}</div>
                   </div>
                 </div>
-
-                {/* Site photo */}
                 <div className="dv-site-photo">
-                  <div className="dv-photo-bg" />
-                  <div className="dv-photo-overlay" />
-                  {/* pylône SVG overlay */}
+                  <div className="dv-photo-bg" /><div className="dv-photo-overlay" />
                   <svg className="dv-pylon-icon" viewBox="0 0 60 100" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" aria-hidden="true">
-                    <line x1="30" y1="5" x2="30" y2="95"/>
-                    <line x1="30" y1="20" x2="10" y2="50"/><line x1="30" y1="20" x2="50" y2="50"/>
+                    <line x1="30" y1="5" x2="30" y2="95"/><line x1="30" y1="20" x2="10" y2="50"/><line x1="30" y1="20" x2="50" y2="50"/>
                     <line x1="30" y1="35" x2="15" y2="55"/><line x1="30" y1="35" x2="45" y2="55"/>
-                    <line x1="10" y1="50" x2="50" y2="50"/>
-                    <line x1="15" y1="55" x2="45" y2="55"/>
+                    <line x1="10" y1="50" x2="50" y2="50"/><line x1="15" y1="55" x2="45" y2="55"/>
                     <line x1="10" y1="50" x2="10" y2="95"/><line x1="50" y1="50" x2="50" y2="95"/>
-                    <line x1="10" y1="95" x2="50" y2="95"/>
-                    <line x1="5" y1="5" x2="55" y2="5"/>
+                    <line x1="10" y1="95" x2="50" y2="95"/><line x1="5" y1="5" x2="55" y2="5"/>
                     <circle cx="30" cy="5" r="3" fill="#E2000F" stroke="none"/>
                   </svg>
                 </div>
               </section>
             </div>
 
-            {/* RIGHT ────────────────────────────── */}
+            {/* RIGHT */}
             <div className="dv-right">
-
-              {/* Équipements Estimés */}
+              {/* Équipements */}
               <section className="dv-card">
-                <h2 className="dv-card-title">Équipements Estimés</h2>
-                <table className="dv-equip-table">
-                  <thead>
-                    <tr>
-                      <th>ARTICLE</th>
-                      <th>QUANTITÉ</th>
-                      <th>VALEUR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.equipements.map((item, i) => {
-                      const IconComponent = item.Icon;
-                      return (
-                        <tr key={i}>
-                          <td>
-                            <div className="dv-equip-label">
-                              <span className="dv-equip-icon"><IconComponent /></span>
-                              {item.label}
-                            </div>
-                          </td>
-                          <td className="dv-equip-qty">{item.qty}</td>
-                          <td className="dv-equip-val">{item.val}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div className="dv-total-row">
-                  <span className="dv-total-label">Total Estimé</span>
-                  <span className="dv-total-val">{data.total}</span>
+                <div className="dv-card-title-row dv-card-title-row--between">
+                  <h2 className="dv-card-title dcd-section-title">Équipements Sinistrés</h2>
                 </div>
+                <ul className="dcd-equip-list">
+                  {equipements.length === 0 ? (
+                    <li className="dcd-equip-empty">Aucun équipement déclaré</li>
+                  ) : equipements.map((item, i) => (
+                    <li key={item.idEquipement || i} className="dcd-equip-item">
+                      <div className="dcd-equip-info">
+                        <p className="dcd-equip-name">{item.nomMarque}</p>
+                        <p className="dcd-equip-meta">
+                          QUANTITÉ: {item.quantiteImpactee}x
+                          {item.valeurComptable > 0 && ` • ${parseFloat(item.valeurComptable).toLocaleString('fr-FR')} DZD`}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              {/* Estimation Financière */}
+              <section className="dv-card">
+                <h2 className="dv-card-title dcd-section-title">Estimation Financière (DZD)</h2>
+                <div className="dcd-fin-box">
+                  <span className="dcd-fin-currency">DA</span>
+                  <span className="dcd-fin-amount">{totalEstime.toLocaleString('fr-FR')}</span>
+                </div>
+                <p className="dcd-fin-note">
+                  {equipements.length > 0
+                    ? `Basé sur ${equipements.length} équipement(s) déclaré(s)`
+                    : 'Montant estimé initial'}
+                </p>
               </section>
 
               {/* Pièces Jointes */}
@@ -261,32 +302,43 @@ export default function DossierValidation() {
                 <div className="dv-card-title-row dv-card-title-row--between">
                   <h2 className="dv-card-title">Pièces Jointes</h2>
                   <span className="dv-files-count">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2z"/></svg>
-                    {data.fichiers} Fichiers
+                    <IconFolder />
+                    {pieces.length} Fichier{pieces.length !== 1 ? 's' : ''}
                   </span>
                 </div>
                 <div className="dv-pj-grid">
-                  <div className="dv-pj-thumb dv-pj-img1" />
-                  <div className="dv-pj-thumb dv-pj-img2" />
-                  <div className="dv-pj-thumb dv-pj-pdf">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    <span>Rapport.pdf</span>
-                  </div>
+                  {pieces.length === 0 ? (
+                    <p className="dcd-pj-empty">Aucune pièce jointe</p>
+                  ) : pieces.map((piece, i) => {
+                    const fileUrl = piece.fichier?.startsWith('http') ? piece.fichier : `http://localhost:8000${piece.fichier}`
+                    const isImage = piece.fichier && /\.(jpg|jpeg|png|gif|webp)$/i.test(piece.fichier)
+                    return isImage ? (
+                      <a key={piece.idPiece || i} href={fileUrl} target="_blank" rel="noopener noreferrer"
+                        className="dv-pj-thumb" style={{ backgroundImage: `url(${fileUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    ) : (
+                      <a key={piece.idPiece || i} href={fileUrl} target="_blank" rel="noopener noreferrer" className="dv-pj-thumb dv-pj-pdf">
+                        <IconFile /><span>{piece.titreDoc || `Document ${i + 1}`}</span>
+                      </a>
+                    )
+                  })}
                 </div>
               </section>
             </div>
           </div>
 
+          {/* Bottom actions */}
           <div className="dv-actions">
-            <button
-              className="dv-hold-btn"
-              onClick={handleInfoManquante}
-            >
+            <button className="dv-hold-btn" onClick={handleInfoManquante} disabled={submitting}>
               Mettre en Attente (Infos Manquantes)
             </button>
-            <button className="dv-pdf-btn" onClick={() => window.print()}>
-              Générer PDF
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            <button className="dv-pdf-btn" onClick={exportPDF}>
+              Imprimer le Dossier
+              <IconArrow />
+            </button>
+            <button className="dv-validate-btn" onClick={handleValider} disabled={submitting}
+              style={{ opacity: submitting ? 0.7 : 1 }}>
+              <IconCheck />
+              {submitting ? 'Traitement...' : 'Valider le Dossier'}
             </button>
           </div>
         </main>
@@ -295,19 +347,32 @@ export default function DossierValidation() {
   )
 }
 
-/* ── Equipment icons ─────────────────────────────────── */
-function IconRouter() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="9" width="22" height="12" rx="2"/><circle cx="6" cy="15" r="1"/><circle cx="10" cy="15" r="1"/><path d="M5 9V7a7 7 0 0 1 14 0v2"/></svg>
+/* ── Reusable sub-components ── */
+function ChipItem({ label, value }) {
+  return (
+    <div className="dv-chip">
+      <span className="dv-chip-label">{label}</span>
+      <span className="dv-chip-val">{value}</span>
+    </div>
+  )
 }
-function IconCable() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/><path d="M16 6h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+
+function InfoField({ label, value }) {
+  return (
+    <div className="dv-info-field">
+      <span className="dv-info-label">{label}</span>
+      <span className="dv-info-val">{value || 'N/A'}</span>
+    </div>
+  )
 }
-function IconBattery() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="13" x2="23" y2="11"/></svg>
-}
-function IconBell() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-}
-function IconUser() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-}
+
+/* ── Icons ── */
+function IconBell() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> }
+function IconUser() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
+function IconUserCard() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
+function IconDocument() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> }
+function IconPin() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> }
+function IconFolder() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2z"/></svg> }
+function IconFile() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> }
+function IconArrow() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg> }
+function IconCheck() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg> }

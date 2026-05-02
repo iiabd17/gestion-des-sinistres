@@ -7,7 +7,7 @@ de gestion des sinistres Djezzy.
 Chaque classe vérifie :
   1. L'utilisateur est authentifié
   2. Le compte est actif (estActif = True)
-  3. Le profil spécialisé correspondant existe (Multi-Table Inheritance)
+  3. Le profil spécialisé correspondant existe OU l'utilisateur est Admin
 
 Utilisation dans les vues :
     permission_classes = [IsAuthenticated, IsIngenieur]
@@ -16,14 +16,19 @@ Utilisation dans les vues :
 from rest_framework.permissions import BasePermission
 
 
+def _is_admin(user):
+    """Retourne True si l'utilisateur est un superuser ou membre du staff."""
+    return bool(user and (user.is_staff or user.is_superuser))
+
+
 # ─────────────────────────────────────────────
 #  PERMISSIONS PAR RÔLE MÉTIER
 # ─────────────────────────────────────────────
 
 class IsEquipeTerrain(BasePermission):
     """
-    Équipe Terrain (Field Team).
-    
+    Équipe Terrain (Field Team) — ou Admin.
+
     Responsabilités :
     - Créer les déclarations initiales de sinistre.
     - Uploader les photos prises sur les lieux.
@@ -32,18 +37,17 @@ class IsEquipeTerrain(BasePermission):
     message = "Accès réservé aux membres de l'Équipe Terrain."
 
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and getattr(request.user, 'estActif', False)
-            and hasattr(request.user, 'equipeterrain')
-        )
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        return _is_admin(request.user) or hasattr(request.user, 'equipeterrain')
 
 
 class IsIngenieur(BasePermission):
     """
-    Ingénieur (Technical Department).
-    
+    Ingénieur (Technical Department) — ou Admin.
+
     Responsabilités :
     - Compléter le dossier technique.
     - Évaluer les dommages matériels.
@@ -52,18 +56,17 @@ class IsIngenieur(BasePermission):
     message = "Accès réservé aux ingénieurs du département technique."
 
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and getattr(request.user, 'estActif', False)
-            and hasattr(request.user, 'ingenieur')
-        )
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        return _is_admin(request.user) or hasattr(request.user, 'ingenieur')
 
 
 class IsLegal(BasePermission):
     """
-    Service Légal (Legal Department).
-    
+    Service Légal (Legal Department) — ou Admin.
+
     Responsabilités :
     - Ajouter et consulter les Procès-Verbaux (PV de Police / Gendarmerie).
     - Mettre à jour l'état d'avancement des procédures juridiques.
@@ -71,18 +74,17 @@ class IsLegal(BasePermission):
     message = "Accès réservé au service légal."
 
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and getattr(request.user, 'estActif', False)
-            and hasattr(request.user, 'legal')
-        )
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        return _is_admin(request.user) or hasattr(request.user, 'legal')
 
 
 class IsHse(BasePermission):
     """
-    Service HSE (Health, Safety & Environment).
-    
+    Service HSE (Health, Safety & Environment) — ou Admin.
+
     Responsabilités :
     - Réviser les circonstances du sinistre (angle sécurité).
     - Apporter des observations et validations de conformité.
@@ -90,18 +92,17 @@ class IsHse(BasePermission):
     message = "Accès réservé au service HSE."
 
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and getattr(request.user, 'estActif', False)
-            and hasattr(request.user, 'hse')
-        )
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        return _is_admin(request.user) or hasattr(request.user, 'hse')
 
 
 class IsAssurance(BasePermission):
     """
-    Direction de l'Assurance (Insurance Department).
-    
+    Direction de l'Assurance (Insurance Department) — ou Admin.
+
     Responsabilités :
     - Consulter l'intégralité du dossier (Terrain + Technique + PV + HSE).
     - Gérer les interactions avec les assureurs externes.
@@ -111,12 +112,11 @@ class IsAssurance(BasePermission):
     message = "Accès réservé à la direction de l'assurance."
 
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and getattr(request.user, 'estActif', False)
-            and hasattr(request.user, 'assurance')
-        )
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        return _is_admin(request.user) or hasattr(request.user, 'assurance')
 
 
 # ─────────────────────────────────────────────
@@ -126,7 +126,7 @@ class IsAssurance(BasePermission):
 class IsAdmin(BasePermission):
     """
     Administrateur Système OU Directrice Assurance.
-    
+
     Responsabilités :
     - Gestion des comptes utilisateurs (CRUD, activation/désactivation).
     - Maintenance des tables de référence (Régions, Types d'équipements).
@@ -139,7 +139,7 @@ class IsAdmin(BasePermission):
         if not getattr(request.user, 'estActif', False):
             return False
         # Admin classique
-        if request.user.is_staff or request.user.is_superuser:
+        if _is_admin(request.user):
             return True
         # Directrice Assurance
         if hasattr(request.user, 'assurance'):
@@ -159,7 +159,7 @@ class IsAdminOrSelf(BasePermission):
             return False
 
         # Admin : accès global
-        if request.user.is_staff or request.user.is_superuser:
+        if _is_admin(request.user):
             return True
 
         # Utilisateur standard : uniquement ses propres données
@@ -174,7 +174,7 @@ class IsDeclarationOwner(BasePermission):
     """
     Vérifie que l'utilisateur est le créateur du sinistre/déclaration.
     S'applique via has_object_permission pour les actions de détail.
-    
+
     Note : Le nom du champ ForeignKey vers Utilisateur dans le modèle
     Sinistre doit être ajusté selon l'implémentation du module sinistres.
     """
@@ -187,7 +187,7 @@ class IsDeclarationOwner(BasePermission):
             return False
 
         # Les administrateurs ont un accès global
-        if request.user.is_staff or request.user.is_superuser:
+        if _is_admin(request.user):
             return True
 
         # Vérification du propriétaire

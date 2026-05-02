@@ -438,6 +438,25 @@
 .dv-pdf-btn:hover { background: #c0000c; transform: translateY(-1px); }
 .dv-pdf-btn svg { width: 16px; height: 16px; }
 
+.dv-validate-btn {
+  padding: 14px 28px;
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background .15s, transform .15s;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+}
+.dv-validate-btn:hover { background: #15803d; transform: translateY(-1px); }
+.dv-validate-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
 /* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 900px) {
   .dv-body { grid-template-columns: 1fr; }

@@ -1,103 +1,141 @@
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './DossierValidation.css'
+import './DossierCompleterDetail.css'
 
-/* ── Mock data (keyed by dossier id) ─────────────────── */
-const dossiers = {
-  'RZY-2023-6642': {
-    site: 'Algiers – Hydra', date: '14 Oct 2023', nature: 'Incendie',
-    declarant: { nom: 'Amine Belkacem', emploi: 'DZ-99421', tel: '+213 798 12 34 56', dept: 'Équipe Terrain – Zone Sud' },
-    description: 'Pôle technologique Hydra, Bâtiment B. Station de base macro-site indoor. Équipement de transmission principal.',
-    gps: '35.7416° N,  3.0371° E',
-    equipements: [
-      { Icon: IconRouter,  label: 'Routeurs Cisco 9k',     qty: '2x',   val: '320,000 DZD' },
-      { Icon: IconCable,   label: 'Câbles Fibre Optique',  qty: '100m', val: '45,000 DZD'  },
-      { Icon: IconBattery, label: 'Unité Batterie UPS',    qty: '1x',   val: '85,000 DZD'  },
-    ],
-    total: '450,000 DZD',
-    fichiers: 8,
-  },
-  'RZY-2023-8911': {
-    site: 'Oran-Center', date: '15 Oct 2023', nature: "Dégâts des eaux",
-    declarant: { nom: 'Karim Mansouri', emploi: 'DZ-88302', tel: '+213 770 45 67 89', dept: 'Équipe Terrain – Zone Ouest' },
-    description: "Centre de commutation principal d'Oran. Inondation du sous-sol suite à de fortes pluies. Matériel de réseau endommagé.",
-    gps: '35.6969° N, -0.6330° W',
-    equipements: [
-      { Icon: IconRouter,  label: 'Switch Cisco Catalyst', qty: '3x',   val: '75,000 DZD' },
-      { Icon: IconCable,   label: 'Câblage réseau',        qty: '200m', val: '18,000 DZD' },
-      { Icon: IconBattery, label: 'Onduleur APC',          qty: '2x',   val: '27,500 DZD' },
-    ],
-    total: '120,500 DZD',
-    fichiers: 5,
-  },
-  'RZY-2023-1064': {
-    site: 'Constantine', date: '18 Oct 2023', nature: 'Vol Équipement',
-    declarant: { nom: 'Salah Benali', emploi: 'DZ-76120', tel: '+213 661 23 45 67', dept: 'Sécurité – Zone Est' },
-    description: 'Site BTS Constantine-Nord. Vol de matériel de transmission lors du weekend. Effraction signalée au niveau du local technique.',
-    gps: '36.3650° N, 6.6147° E',
-    equipements: [
-      { Icon: IconRouter,  label: 'Émetteur-récepteur',    qty: '4x',   val: '640,000 DZD' },
-      { Icon: IconCable,   label: 'Câbles coaxiaux',       qty: '50m',  val: '12,000 DZD'  },
-      { Icon: IconBattery, label: 'Batteries lithium',     qty: '8x',   val: '238,000 DZD' },
-    ],
-    total: '890,000 DZD',
-    fichiers: 3,
-  },
-  'RZY-2023-1122': {
-    site: 'Setif–Industrial', date: '20 Oct 2023', nature: 'Accident',
-    declarant: { nom: 'Houda Cherif', emploi: 'DZ-91034', tel: '+213 699 87 65 43', dept: 'Maintenance – Zone Centre' },
-    description: "Zone industrielle de Sétif, pylône P-12. Accident de véhicule ayant endommagé la structure support d'antennes.",
-    gps: '36.1898° N, 5.4114° E',
-    equipements: [
-      { Icon: IconRouter,  label: 'Antenne sectorielle',   qty: '2x',   val: '38,000 DZD' },
-      { Icon: IconCable,   label: 'Câblage alimentation',  qty: '30m',  val: '9,000 DZD'  },
-      { Icon: IconBattery, label: 'Boîtier de protection', qty: '1x',   val: '18,000 DZD' },
-    ],
-    total: '65,000 DZD',
-    fichiers: 6,
-  },
+/* ── Nature → badge style ─────────────────── */
+const NATURE_STYLES = {
+  'INCENDIE':            { bg: '#fef9c3', color: '#a16207' },
+  'VOL':                 { bg: '#ede9fe', color: '#7c3aed' },
+  'ACTE_DE_SABOTAGE':    { bg: '#ede9fe', color: '#7c3aed' },
+  'FIBRE_OPTIQUE':       { bg: '#dbeafe', color: '#1d4ed8' },
+  'INTEMPERIE':          { bg: '#dbeafe', color: '#1d4ed8' },
+  'CATASTROPHE_NATUREL': { bg: '#fee2e2', color: '#b91c1c' },
+  'VIOLENCE_POLITIQUE':  { bg: '#fce7f3', color: '#be185d' },
+  'RC':                  { bg: '#d1fae5', color: '#065f46' },
 }
 
-const natureStyle = {
-  'Incendie':         { bg: '#fef9c3', color: '#a16207' },
-  "Dégâts des eaux":  { bg: '#dbeafe', color: '#1d4ed8' },
-  'Vol Équipement':   { bg: '#ede9fe', color: '#7c3aed' },
-  'Accident':         { bg: '#d1fae5', color: '#065f46' },
-}
+const EMPTY_EQUIP = { nomMarque: '', quantiteImpactee: 1, valeurComptable: 0 }
 
 export default function DossierCompleterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  /* Normalise the id - URL uses the raw id like RZY-2023-6642 */
-  const data = dossiers[id] || dossiers['RZY-2023-6642']
-  const ns   = natureStyle[data.nature] || { bg: '#f0f0f0', color: '#555' }
-  const handleCompleterDossier = () => {
-    try {
-      const savedCompleter = JSON.parse(localStorage.getItem('dossiersCompleter') || '[]');
-      const savedValider = JSON.parse(localStorage.getItem('dossiersValider') || '[]');
-      
-      const dossierIndex = savedCompleter.findIndex(d => d.id === id || d.id === '#' + id);
-      if (dossierIndex !== -1) {
-        const movedDossier = savedCompleter.splice(dossierIndex, 1)[0];
-        savedValider.unshift({
-          id: movedDossier.id,
-          site: movedDossier.site,
-          ville: movedDossier.ville || 'À préciser',
-          date: movedDossier.date,
-          nature: movedDossier.nature,
-          montant: '1,450,000.00',
-          devise: 'DZD'
-        });
-        
-        localStorage.setItem('dossiersCompleter', JSON.stringify(savedCompleter));
-        localStorage.setItem('dossiersValider', JSON.stringify(savedValider));
-      }
-    } catch (e) {
-      console.error(e);
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [showEquipForm, setShowEquipForm] = useState(false)
+  const [newEquip, setNewEquip] = useState(EMPTY_EQUIP)
+
+  // ── Fetch sinistre data ──
+  useEffect(() => {
+    setLoading(true)
+    api.get(`/sinistres/${id}/`)
+      .then(res => setData(res.data))
+      .catch(() => toast.error('Erreur lors du chargement du dossier'))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  // ── Add equipment ──
+  const handleAddEquipement = useCallback(async () => {
+    if (!newEquip.nomMarque.trim()) {
+      toast.error("Veuillez saisir le nom de l'équipement")
+      return
     }
-    navigate('/declarations', { state: { tab: 'valider' } });
+    try {
+      const res = await api.post('/equipements/', {
+        idEquipement: `EQ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        nomMarque: newEquip.nomMarque,
+        quantiteImpactee: newEquip.quantiteImpactee,
+        valeurComptable: newEquip.valeurComptable,
+        sinistre: id,
+      })
+      setData(prev => ({ ...prev, equipements: [...(prev.equipements || []), res.data] }))
+      setNewEquip(EMPTY_EQUIP)
+      setShowEquipForm(false)
+      toast.success('Équipement ajouté')
+    } catch {
+      toast.error("Erreur lors de l'ajout de l'équipement")
+    }
+  }, [newEquip, id])
+
+  // ── Remove equipment ──
+  const handleRemoveEquipement = useCallback(async (equipId) => {
+    try {
+      await api.delete(`/equipements/${equipId}/`)
+      setData(prev => ({ ...prev, equipements: prev.equipements.filter(e => e.idEquipement !== equipId) }))
+      toast.success('Équipement supprimé')
+    } catch {
+      toast.error('Erreur lors de la suppression')
+    }
+  }, [])
+
+  // ── Computed values (derived from data) ──
+  const equipements = data?.equipements || []
+  const pieces = data?.piecesJointes || []
+  const totalEstime = equipements.length > 0
+    ? equipements.reduce((sum, e) => sum + (parseFloat(e.valeurComptable) || 0) * (e.quantiteImpactee || 1), 0)
+    : parseFloat(data?.montantEstime) || 0
+
+  // ── Complete dossier (send to expertise) ──
+  const handleCompleterDossier = useCallback(async () => {
+    setSubmitting(true)
+    try {
+      await api.post(`/sinistres/${id}/expertise/`, {
+        observationsIngenieur: data?.descriptionDetailliee || 'Expertise complétée.',
+        montantEstime: totalEstime,
+      })
+      toast.success('Dossier complété et transmis pour expertise')
+      navigate('/declarations', { state: { tab: 'valider' } })
+    } catch (err) {
+      if (err.response?.status === 403) {
+        toast.error("Vous n'avez pas la permission de compléter ce dossier.")
+      } else {
+        toast.error(err.response?.data?.error || 'Erreur lors de la complétion du dossier')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }, [id, data, totalEstime, navigate])
+
+  // ── Loading / Error states ──
+  if (loading) {
+    return (
+      <div className="dv-layout">
+        <Sidebar />
+        <div className="dv-main dcd-center">
+          <div className="dcd-spinner" />
+          <p className="dcd-loading-text">Chargement du dossier...</p>
+        </div>
+      </div>
+    )
   }
+
+  if (!data) {
+    return (
+      <div className="dv-layout">
+        <Sidebar />
+        <div className="dv-main dcd-center">
+          <p className="dcd-error-text">Dossier introuvable</p>
+        </div>
+      </div>
+    )
+  }
+
+  const ns = NATURE_STYLES[data.nature] || { bg: '#f0f0f0', color: '#555' }
+  const declarant = data.createur_detail || {}
+  const site = data.site_detail || {}
+  const gpsText = (site.latitude && site.longitude)
+    ? `${site.latitude.toFixed(4)}° N, ${site.longitude.toFixed(4)}° E`
+    : 'Non disponible'
+  const siteLabel = [site.wilaya, site.nomSite].filter(Boolean).join(' – ') || site.codeSite || 'N/A'
+  const dateLabel = data.dateSurvenance
+    ? new Date(data.dateSurvenance).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+    : ''
+  const statutLabel = data.statut === 'OUVERT' ? 'DOSSIER EN ATTENTE' : data.statut_label?.toUpperCase() || data.statut
 
   return (
     <div className="dv-layout">
@@ -118,66 +156,47 @@ export default function DossierCompleterDetail() {
         </header>
 
         <main className="dv-content">
-          {/* ── Page header ──────────────────────── */}
+          {/* ── Page header ── */}
           <div className="dv-page-header">
             <div className="dv-page-meta">
               <span className="dv-eyebrow">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                DOSSIER EN ATTENTE
+                <IconDocument />
+                {statutLabel}
               </span>
-              <span className="dv-eyebrow-id">#{id || 'RZY-2023-0842'}</span>
+              <span className="dv-eyebrow-id">#{data.idSinistre}</span>
             </div>
             <div className="dv-header-row">
               <h1 className="dv-title">Dossier à Compléter</h1>
               <div className="dv-chips">
-                <div className="dv-chip">
-                  <span className="dv-chip-label">SITE</span>
-                  <span className="dv-chip-val">{data.site}</span>
-                </div>
-                <div className="dv-chip">
-                  <span className="dv-chip-label">DATE</span>
-                  <span className="dv-chip-val">{data.date}</span>
-                </div>
+                <ChipItem label="SITE" value={siteLabel} />
+                <ChipItem label="DATE" value={dateLabel} />
                 <div className="dv-chip">
                   <span className="dv-chip-label">NATURE</span>
                   <span className="dv-chip-val dv-nature" style={{ background: ns.bg, color: ns.color }}>
                     <span className="dv-nature-dot" style={{ background: ns.color }} />
-                    {data.nature}
+                    {data.nature_label}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* ── Two-column body ──────────────────── */}
+          {/* ── Two-column body ── */}
           <div className="dv-body">
 
-            {/* LEFT ─────────────────────────────── */}
+            {/* LEFT */}
             <div className="dv-left">
-
               {/* Informations du Déclarant */}
               <section className="dv-card">
                 <div className="dv-card-title-row">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <IconUserCard />
                   <h2 className="dv-card-title">Informations du Déclarant</h2>
                 </div>
                 <div className="dv-info-grid">
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">NOM COMPLET</span>
-                    <span className="dv-info-val">{data.declarant.nom}</span>
-                  </div>
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">EMPLOI CD</span>
-                    <span className="dv-info-val">{data.declarant.emploi}</span>
-                  </div>
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">NUMÉRO DE TÉLÉPHONE</span>
-                    <span className="dv-info-val">{data.declarant.tel}</span>
-                  </div>
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">DÉPARTEMENT</span>
-                    <span className="dv-info-val">{data.declarant.dept}</span>
-                  </div>
+                  <InfoField label="NOM COMPLET" value={declarant.nom_complet || data.createur_nom} />
+                  <InfoField label="EMPLOI CD" value={declarant.matricule || declarant.username} />
+                  <InfoField label="NUMÉRO DE TÉLÉPHONE" value={declarant.tel} />
+                  <InfoField label="DÉPARTEMENT" value={declarant.departement || declarant.fonction} />
                 </div>
               </section>
 
@@ -187,59 +206,105 @@ export default function DossierCompleterDetail() {
                 <div className="dv-tech-grid">
                   <div className="dv-info-field">
                     <span className="dv-info-label">DESCRIPTION DU SITE</span>
-                    <p className="dv-info-desc">{data.description}</p>
+                    <p className="dv-info-desc">{data.descriptionDetailliee || 'Aucune description fournie.'}</p>
                   </div>
                   <div className="dv-info-field">
                     <span className="dv-info-label">COORDONNÉES GPS</span>
                     <div className="dv-gps-val">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      {data.gps}
+                      <IconPin />
+                      {gpsText}
                     </div>
                   </div>
                 </div>
 
-                {/* Site photo */}
                 <div className="dv-site-photo">
                   <div className="dv-photo-bg" />
                   <div className="dv-photo-overlay" />
-                  {/* pylône SVG overlay */}
                   <svg className="dv-pylon-icon" viewBox="0 0 60 100" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" aria-hidden="true">
-                    <line x1="30" y1="5" x2="30" y2="95"/>
-                    <line x1="30" y1="20" x2="10" y2="50"/><line x1="30" y1="20" x2="50" y2="50"/>
+                    <line x1="30" y1="5" x2="30" y2="95"/><line x1="30" y1="20" x2="10" y2="50"/><line x1="30" y1="20" x2="50" y2="50"/>
                     <line x1="30" y1="35" x2="15" y2="55"/><line x1="30" y1="35" x2="45" y2="55"/>
-                    <line x1="10" y1="50" x2="50" y2="50"/>
-                    <line x1="15" y1="55" x2="45" y2="55"/>
+                    <line x1="10" y1="50" x2="50" y2="50"/><line x1="15" y1="55" x2="45" y2="55"/>
                     <line x1="10" y1="50" x2="10" y2="95"/><line x1="50" y1="50" x2="50" y2="95"/>
-                    <line x1="10" y1="95" x2="50" y2="95"/>
-                    <line x1="5" y1="5" x2="55" y2="5"/>
+                    <line x1="10" y1="95" x2="50" y2="95"/><line x1="5" y1="5" x2="55" y2="5"/>
                     <circle cx="30" cy="5" r="3" fill="#E2000F" stroke="none"/>
                   </svg>
                 </div>
               </section>
             </div>
 
-            {/* RIGHT ────────────────────────────── */}
+            {/* RIGHT */}
             <div className="dv-right">
 
               {/* Équipements Sinistrés */}
-              <section className="dv-card" style={{ borderBottom: 'none', paddingBottom: 0 }}>
-                <div className="dv-card-title-row dv-card-title-row--between" style={{ marginBottom: 16 }}>
-                  <h2 className="dv-card-title" style={{ fontSize: 13.5, color: '#222' }}>Équipements Sinistrés</h2>
-                  <button style={{ border: 'none', background: 'transparent', color: '#b91c1c', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width="13" height="13"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                    Ajouter
+              <section className="dv-card dcd-equip-section">
+                <div className="dv-card-title-row dv-card-title-row--between dcd-equip-header">
+                  <h2 className="dv-card-title dcd-section-title">Équipements Sinistrés</h2>
+                  <button className="dcd-add-btn" onClick={() => setShowEquipForm(!showEquipForm)}>
+                    <IconPlus /> Ajouter
                   </button>
                 </div>
-                
-                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {data.equipements.map((item, i) => (
-                    <li key={i} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderRadius: '8px', background: '#f5f4f4' }}>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: '13px', fontWeight: '700', color: '#222', margin: '0 0 4px' }}>{item.label}</p>
-                        <p style={{ fontSize: '9.5px', color: '#a0a0a0', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>QUANTITÉ: {item.qty} {item.qty === '1x' ? 'UNITÉ' : 'UNITÉS'}</p>
+
+                {showEquipForm && (
+                  <div className="dcd-equip-form">
+                    <div className="dcd-form-field">
+                      <label className="dcd-form-label">Nom / Marque</label>
+                      <input
+                        type="text"
+                        className="dcd-form-input"
+                        placeholder="Ex: Routeur Cisco 9k"
+                        value={newEquip.nomMarque}
+                        onChange={e => setNewEquip(prev => ({ ...prev, nomMarque: e.target.value }))}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="dcd-form-row">
+                      <div className="dcd-form-field">
+                        <label className="dcd-form-label">Quantité</label>
+                        <input
+                          type="number"
+                          className="dcd-form-input"
+                          min="1"
+                          value={newEquip.quantiteImpactee}
+                          onChange={e => setNewEquip(prev => ({ ...prev, quantiteImpactee: parseInt(e.target.value) || 1 }))}
+                        />
                       </div>
-                      <button style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', padding: '4px' }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      <div className="dcd-form-field">
+                        <label className="dcd-form-label">Valeur (DZD)</label>
+                        <input
+                          type="number"
+                          className="dcd-form-input"
+                          min="0"
+                          placeholder="0"
+                          value={newEquip.valeurComptable || ''}
+                          onChange={e => setNewEquip(prev => ({ ...prev, valeurComptable: parseFloat(e.target.value) || 0 }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="dcd-form-actions">
+                      <button className="dcd-btn-cancel" onClick={() => { setShowEquipForm(false); setNewEquip(EMPTY_EQUIP) }}>
+                        Annuler
+                      </button>
+                      <button className="dcd-btn-confirm" onClick={handleAddEquipement}>
+                        <IconCheck /> Confirmer
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <ul className="dcd-equip-list">
+                  {equipements.length === 0 ? (
+                    <li className="dcd-equip-empty">Aucun équipement ajouté</li>
+                  ) : equipements.map((item) => (
+                    <li key={item.idEquipement} className="dcd-equip-item">
+                      <div className="dcd-equip-info">
+                        <p className="dcd-equip-name">{item.nomMarque}</p>
+                        <p className="dcd-equip-meta">
+                          QUANTITÉ: {item.quantiteImpactee}x {item.quantiteImpactee === 1 ? 'UNITÉ' : 'UNITÉS'}
+                          {item.valeurComptable > 0 && ` • ${parseFloat(item.valeurComptable).toLocaleString('fr-FR')} DZD`}
+                        </p>
+                      </div>
+                      <button className="dcd-equip-remove" onClick={() => handleRemoveEquipement(item.idEquipement)} aria-label="Supprimer">
+                        <IconX />
                       </button>
                     </li>
                   ))}
@@ -247,13 +312,17 @@ export default function DossierCompleterDetail() {
               </section>
 
               {/* Estimation Financière */}
-              <section className="dv-card" style={{ paddingTop: 24 }}>
-                <h2 className="dv-card-title" style={{ fontSize: 13.5, color: '#222', marginBottom: 12 }}>Estimation Financière (DZD)</h2>
-                <div style={{ background: '#ececec', borderRadius: '8px', padding: '18px 24px', display: 'flex', alignItems: 'center' }}>
-                  <span style={{ color: '#999', fontWeight: '700', fontSize: '13px' }}>DA</span>
-                  <span style={{ marginLeft: '12px', fontSize: '24px', fontWeight: '800', color: '#b91c1c' }}>{data.total.replace(' DZD', '')}</span>
+              <section className="dv-card">
+                <h2 className="dv-card-title dcd-section-title">Estimation Financière (DZD)</h2>
+                <div className="dcd-fin-box">
+                  <span className="dcd-fin-currency">DA</span>
+                  <span className="dcd-fin-amount">{totalEstime.toLocaleString('fr-FR')}</span>
                 </div>
-                <p style={{ fontStyle: 'italic', color: '#a0a0a0', fontSize: '10.5px', margin: '8px 0 0 4px' }}>Basé sur les prix catalogues Q4 2023</p>
+                <p className="dcd-fin-note">
+                  {equipements.length > 0
+                    ? `Basé sur ${equipements.length} équipement(s) déclaré(s)`
+                    : 'Montant estimé initial'}
+                </p>
               </section>
 
               {/* Pièces Jointes */}
@@ -261,33 +330,38 @@ export default function DossierCompleterDetail() {
                 <div className="dv-card-title-row dv-card-title-row--between">
                   <h2 className="dv-card-title">Pièces Jointes</h2>
                   <span className="dv-files-count">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2z"/></svg>
-                    {data.fichiers} Fichiers
+                    <IconFolder />
+                    {pieces.length} Fichier{pieces.length !== 1 ? 's' : ''}
                   </span>
                 </div>
                 <div className="dv-pj-grid">
-                  <div className="dv-pj-thumb dv-pj-img1" />
-                  <div className="dv-pj-thumb dv-pj-img2" />
-                  <div className="dv-pj-thumb dv-pj-pdf">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    <span>Rapport.pdf</span>
-                  </div>
-                  <div className="dv-pj-thumb dv-pj-upload" style={{ background: '#fafafa', border: '1.5px dashed #ddd', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#aaa', cursor: 'pointer', transition: 'border-color 0.2s, color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#b91c1c'; e.currentTarget.style.color = '#b91c1c'; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#ddd'; e.currentTarget.style.color = '#aaa'; }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="24" height="24" style={{ marginBottom: '2px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                  </div>
+                  {pieces.length === 0 ? (
+                    <p className="dcd-pj-empty">Aucune pièce jointe</p>
+                  ) : pieces.map((piece, i) => {
+                    const fileUrl = piece.fichier?.startsWith('http') ? piece.fichier : `http://localhost:8000${piece.fichier}`
+                    const isImage = piece.fichier && /\.(jpg|jpeg|png|gif|webp)$/i.test(piece.fichier)
+
+                    return isImage ? (
+                      <a key={piece.idPiece || i} href={fileUrl} target="_blank" rel="noopener noreferrer"
+                        className="dv-pj-thumb" style={{ backgroundImage: `url(${fileUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    ) : (
+                      <a key={piece.idPiece || i} href={fileUrl} target="_blank" rel="noopener noreferrer" className="dv-pj-thumb dv-pj-pdf">
+                        <IconFile />
+                        <span>{piece.titreDoc || `Document ${i + 1}`}</span>
+                      </a>
+                    )
+                  })}
                 </div>
               </section>
             </div>
           </div>
 
+          {/* Bottom action */}
           <div className="dv-actions">
-            <button
-              className="dv-pdf-btn"
-              style={{ width: '100%', justifyContent: 'center' }}
-              onClick={handleCompleterDossier}
-            >
-              Compléter le dossier
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <button className="dv-pdf-btn" onClick={handleCompleterDossier} disabled={submitting}
+              style={{ width: '100%', justifyContent: 'center', opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? 'Traitement en cours...' : 'Compléter le dossier'}
+              {!submitting && <IconCheckMark />}
             </button>
           </div>
         </main>
@@ -296,19 +370,34 @@ export default function DossierCompleterDetail() {
   )
 }
 
-/* ── Equipment icons ─────────────────────────────────── */
-function IconRouter() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="9" width="22" height="12" rx="2"/><circle cx="6" cy="15" r="1"/><circle cx="10" cy="15" r="1"/><path d="M5 9V7a7 7 0 0 1 14 0v2"/></svg>
+/* ── Reusable sub-components ─────────────────────────── */
+function ChipItem({ label, value }) {
+  return (
+    <div className="dv-chip">
+      <span className="dv-chip-label">{label}</span>
+      <span className="dv-chip-val">{value}</span>
+    </div>
+  )
 }
-function IconCable() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/><path d="M16 6h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+
+function InfoField({ label, value }) {
+  return (
+    <div className="dv-info-field">
+      <span className="dv-info-label">{label}</span>
+      <span className="dv-info-val">{value || 'N/A'}</span>
+    </div>
+  )
 }
-function IconBattery() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="13" x2="23" y2="11"/></svg>
-}
-function IconBell() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-}
-function IconUser() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-}
+
+/* ── Icons (deduplicated) ────────────────────────────── */
+function IconBell() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> }
+function IconUser() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
+function IconUserCard() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
+function IconDocument() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> }
+function IconPin() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> }
+function IconPlus() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="13" height="13"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> }
+function IconX() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> }
+function IconCheck() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg> }
+function IconCheckMark() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> }
+function IconFolder() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2z"/></svg> }
+function IconFile() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> }

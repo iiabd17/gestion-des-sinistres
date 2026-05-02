@@ -145,6 +145,7 @@ class SinistreDetailSerializer(serializers.ModelSerializer):
     statut_label       = serializers.CharField(source='get_statut_display', read_only=True)
     site_detail        = SiteSerializer(source='site', read_only=True)
     createur_nom       = serializers.SerializerMethodField(read_only=True)
+    createur_detail    = serializers.SerializerMethodField(read_only=True)
 
     # Nested relations (lecture seule dans ce sérialiseur)
     piecesJointes     = PieceJointeSerializer(many=True, read_only=True)
@@ -160,7 +161,7 @@ class SinistreDetailSerializer(serializers.ModelSerializer):
             'descriptionDetailliee', 'montantEstime',
             'statut', 'statut_label', 'urgence',
             'dateCreation', 'dateCloture',
-            'site_detail', 'createur', 'createur_nom',
+            'site_detail', 'createur', 'createur_nom', 'createur_detail',
             # Champs spécifiques aux services
             'observationsIngenieur',
             'numeroPV', 'observationsLegal',
@@ -174,6 +175,26 @@ class SinistreDetailSerializer(serializers.ModelSerializer):
         if obj.createur:
             return f"{obj.createur.nom} {obj.createur.prenom}"
         return None
+
+    def get_createur_detail(self, obj):
+        """Retourne les informations complètes du déclarant."""
+        if not obj.createur:
+            return None
+        user = obj.createur
+        detail = {
+            'nom': user.nom,
+            'prenom': user.prenom,
+            'nom_complet': f"{user.nom} {user.prenom}",
+            'tel': user.tel,
+            'email': user.email,
+            'username': user.username,
+        }
+        # Ajouter les champs spécifiques à EquipeTerrain si applicable
+        if hasattr(user, 'equipeterrain'):
+            detail['departement'] = user.equipeterrain.departement or ''
+            detail['fonction'] = user.equipeterrain.fonction or ''
+            detail['matricule'] = user.equipeterrain.matricule or ''
+        return detail
 
 
 # ═════════════════════════════════════════════

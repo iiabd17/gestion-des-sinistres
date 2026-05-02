@@ -1,35 +1,313 @@
-.dcd-layout {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-  background-color: #fce7f3; /* very soft bg to match the dashboard aesthetic or white */
-  background: #fdfdfd;
-}
+/* ═══════════════════════════════════════════════
+   DossierCompleterDetail — Scoped Styles
+   ═══════════════════════════════════════════════ */
 
-.dcd-main {
-  flex: 1;
+/* ── Center state (loading / error) ──────────── */
+.dcd-center {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  position: relative;
-}
-
-.dcd-content {
-  flex: 1;
-  padding: 3rem 2rem;
-  overflow-y: auto;
-  display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: flex-start;
+  gap: 12px;
 }
 
-/* We reuse the panel from Declarations.css, but just make it center and wider */
-.dcd-container {
-  background: white;
+.dcd-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #eee;
+  border-top-color: #E2000F;
+  border-radius: 50%;
+  animation: dcd-spin 0.7s linear infinite;
+}
+
+@keyframes dcd-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dcd-loading-text {
+  color: #94A3B8;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dcd-error-text {
+  color: #E2000F;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Section titles ──────────────────────────── */
+.dcd-section-title {
+  font-size: 13.5px !important;
+  color: #222 !important;
+}
+
+/* ── Equipment section ───────────────────────── */
+.dcd-equip-section {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.dcd-equip-header {
+  margin-bottom: 16px;
+}
+
+/* Add button */
+.dcd-add-btn {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.dcd-add-btn:hover {
+  color: #991b1b;
+}
+
+/* ── Equipment form ──────────────────────────── */
+.dcd-equip-form {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: dcd-slideIn 0.2s ease-out;
+}
+
+@keyframes dcd-slideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dcd-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dcd-form-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #888;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dcd-form-input {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1.5px solid #e2e8f0;
+  font-size: 11.5px;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+  color: #222;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  min-width: 0;
+  height: 30px;
+  box-sizing: border-box;
+}
+
+/* Hide number input spinners */
+.dcd-form-input[type="number"]::-webkit-outer-spin-button,
+.dcd-form-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.dcd-form-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.dcd-form-input:focus {
+  border-color: #E2000F;
+  box-shadow: 0 0 0 2px rgba(226, 0, 15, 0.08);
+}
+
+.dcd-form-input::placeholder {
+  color: #b0b0b0;
+}
+
+.dcd-form-row {
+  display: flex;
+  gap: 4px;
+}
+
+.dcd-form-row .dcd-form-field {
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.dcd-form-row .dcd-form-input {
   width: 100%;
-  max-width: 900px;
-  border-radius: 12px;
-  padding: 40px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-  border: 1px solid #eee;
+}
+
+.dcd-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.dcd-btn-cancel {
+  padding: 7px 16px;
+  border-radius: 7px;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #555;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dcd-btn-cancel:hover {
+  border-color: #999;
+  background: #f9f9f9;
+}
+
+.dcd-btn-confirm {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 16px;
+  border-radius: 7px;
+  border: none;
+  background: #b91c1c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.dcd-btn-confirm:hover {
+  background: #991b1b;
+  transform: translateY(-1px);
+}
+
+/* ── Equipment list ──────────────────────────── */
+.dcd-equip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dcd-equip-empty {
+  padding: 18px 16px;
+  border-radius: 8px;
+  background: #f5f4f4;
+  color: #94A3B8;
+  font-size: 13px;
+  text-align: center;
+}
+
+.dcd-equip-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #f5f4f4;
+  transition: background 0.15s;
+}
+
+.dcd-equip-item:hover {
+  background: #efeeee;
+}
+
+.dcd-equip-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dcd-equip-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #222;
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dcd-equip-meta {
+  font-size: 9.5px;
+  color: #a0a0a0;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.dcd-equip-remove {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.dcd-equip-remove:hover {
+  color: #E2000F;
+  background: rgba(226, 0, 15, 0.06);
+}
+
+/* ── Financial box ───────────────────────────── */
+.dcd-fin-box {
+  background: #f5f4f4;
+  border-radius: 8px;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+}
+
+.dcd-fin-currency {
+  color: #999;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.dcd-fin-amount {
+  margin-left: 12px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #b91c1c;
+}
+
+.dcd-fin-note {
+  font-style: italic;
+  color: #a0a0a0;
+  font-size: 10.5px;
+  margin: 8px 0 0 4px;
+}
+
+/* ── Pièces jointes empty ────────────────────── */
+.dcd-pj-empty {
+  color: #94A3B8;
+  font-size: 13px;
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 12px 0;
+  margin: 0;
 }
