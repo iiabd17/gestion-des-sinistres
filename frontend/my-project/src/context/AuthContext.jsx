@@ -1,11 +1,13 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import api from '../api';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true); // Pour éviter les sauts de page pendant la vérification
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -33,6 +35,27 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // Poll for notifications if user is logged in
+  useEffect(() => {
+    let interval;
+    if (user) {
+      const fetchNotifs = () => {
+        api.get('/notifications/')
+          .then(res => {
+            const unread = res.data.filter(n => !n.is_read).length;
+            setUnreadNotifsCount(unread);
+          })
+          .catch(err => console.error("Erreur polling notifications:", err));
+      };
+      
+      fetchNotifs(); // Fetch immediately
+      interval = setInterval(fetchNotifs, 30000); // Fetch every 30 seconds
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [user]);
+
   const login = (tokenData) => {
     localStorage.setItem('access_token', tokenData.access);
     localStorage.setItem('refresh_token', tokenData.refresh);
@@ -54,7 +77,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, unreadNotifsCount, setUnreadNotifsCount }}>
       {children}
     </AuthContext.Provider>
   );

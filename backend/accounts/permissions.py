@@ -125,21 +125,26 @@ class IsAssurance(BasePermission):
 
 class IsAdmin(BasePermission):
     """
-    Administrateur Système.
+    Administrateur Système OU Directrice Assurance.
     
     Responsabilités :
     - Gestion des comptes utilisateurs (CRUD, activation/désactivation).
     - Maintenance des tables de référence (Régions, Types d'équipements).
     """
-    message = "Accès réservé aux administrateurs du système."
+    message = "Accès réservé aux administrateurs ou à la Directrice Assurance."
 
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and getattr(request.user, 'estActif', False)
-            and (request.user.is_staff or request.user.is_superuser)
-        )
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        # Admin classique
+        if request.user.is_staff or request.user.is_superuser:
+            return True
+        # Directrice Assurance
+        if hasattr(request.user, 'assurance'):
+            return True
+        return False
 
 
 class IsAdminOrSelf(BasePermission):

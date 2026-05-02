@@ -18,11 +18,11 @@ function Login() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    
+
     try {
       const response = await api.post('/token/', {
         username: email,
-        password: password 
+        password: password
       })
 
       // Use the login function from AuthContext which handles token storage and user decoding
@@ -49,9 +49,7 @@ function Login() {
 
         {/* Logo */}
         <div className="lp-logo">
-          <svg className="lp-logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <polygon points="6,4 36,20 6,36" fill="#E2000F" />
-          </svg>
+          <img src="/logo.png" alt="Logo" className="lp-logo-image" />
           <span className="lp-logo-text">DJEZZY</span>
         </div>
 

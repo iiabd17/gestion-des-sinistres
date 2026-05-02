@@ -13,8 +13,8 @@
   overflow-y: auto;
   font-family: 'Inter', sans-serif;
   flex-shrink: 0;
-  border-right: 1px solid rgba(0,0,0,.08);
-  box-shadow: 2px 0 8px rgba(0,0,0,.03);
+  border-right: 1px solid rgba(0, 0, 0, .08);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, .03);
 }
 
 .sb-brand {
@@ -22,11 +22,16 @@
   align-items: center;
   gap: 8px;
   padding: 18px 16px 20px;
-  border-bottom: 1px solid rgba(0,0,0,.08);
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
   margin-bottom: 8px;
 }
 
-.sb-brand-icon { width: 32px; height: 32px; flex-shrink: 0; object-fit: contain; }
+.sb-brand-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
 
 .sb-brand-name {
   font-size: 13px;
@@ -52,7 +57,7 @@
   background: none;
   border: none;
   border-radius: 8px;
-  color: rgba(0,0,0,.55);
+  color: rgba(0, 0, 0, .55);
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -61,24 +66,49 @@
   transition: background .18s, color .18s;
 }
 
-.sb-nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.sb-nav-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
 
-.sb-nav-item:hover { background: rgba(0,0,0,.05); color: #111; }
+.sb-nav-item:hover {
+  background: rgba(0, 0, 0, .05);
+  color: #111;
+}
 
-.sb-nav-item--active { background: #E2000F !important; color: #fff !important; }
+.sb-nav-item--active {
+  background: #E2000F !important;
+  color: #fff !important;
+}
 
 .sb-nav-bottom {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 12px 8px 0;
-  border-top: 1px solid rgba(0,0,0,.08);
+  border-top: 1px solid rgba(0, 0, 0, .08);
   margin-top: 12px;
 }
 
 @media (max-width: 900px) {
-  .sb-sidebar { width: 56px; min-width: 56px; }
-  .sb-brand-name, .sb-nav-item span { display: none; }
-  .sb-brand { justify-content: center; padding: 18px 8px; }
-  .sb-nav-item { justify-content: center; padding: 10px 8px; }
+  .sb-sidebar {
+    width: 56px;
+    min-width: 56px;
+  }
+
+  .sb-brand-name,
+  .sb-nav-item span {
+    display: none;
+  }
+
+  .sb-brand {
+    justify-content: center;
+    padding: 18px 8px;
+  }
+
+  .sb-nav-item {
+    justify-content: center;
+    padding: 10px 8px;
+  }
 }

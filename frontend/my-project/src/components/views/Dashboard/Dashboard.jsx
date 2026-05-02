@@ -22,7 +22,7 @@ const statutClass = {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { user } = useContext(AuthContext)
+  const { user, unreadNotifsCount } = useContext(AuthContext)
 
   const [sinistres, setSinistres] = useState([])
   const [totalCount, setTotalCount] = useState(0)
@@ -75,11 +75,11 @@ export default function Dashboard() {
         {/* top bar */}
         <header className="db-topbar">
           <div className="db-topbar-actions">
-            <button className="db-icon-btn" aria-label="Notifications">
+            <button className="db-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
               <IconBell />
-              <span className="db-notif-dot" />
+              {unreadNotifsCount > 0 && <span className="db-notif-dot" style={{position: 'absolute', top: 8, right: 8, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
             </button>
-            <button className="db-icon-btn db-avatar" aria-label="Profil">
+            <button className="db-icon-btn db-avatar" aria-label="Profil" onClick={() => navigate('/profile')}>
               <IconUser />
             </button>
             <span style={{ fontSize: '0.85rem', color: '#4A5568', fontWeight: 500 }}>

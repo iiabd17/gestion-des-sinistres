@@ -208,3 +208,29 @@ class ToggleUserStatusView(APIView):
             'message': f"Le compte de {user.nom} {user.prenom} a été {etat}.",
             'estActif': user.estActif,
         }, status=status.HTTP_200_OK)
+
+
+class DeleteUserView(APIView):
+    """
+    DELETE /api/accounts/users/<id>/
+    
+    Supprime un compte utilisateur.
+    Seul l'administrateur ou la Directrice Assurance peut accéder à cet endpoint.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def delete(self, request, user_id):
+        user = get_object_or_404(Utilisateur, pk=user_id)
+
+        # Empêcher l'admin de se supprimer lui-même
+        if user.pk == request.user.pk:
+            return Response(
+                {"message": "Vous ne pouvez pas supprimer votre propre compte."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        nom_complet = f"{user.nom} {user.prenom}"
+        user.delete()
+        return Response({
+            'message': f"Le compte de {nom_complet} a été supprimé.",
+        }, status=status.HTTP_200_OK)

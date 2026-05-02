@@ -174,7 +174,7 @@ class CreateUserSerializer(serializers.Serializer):
     """
     # --- Champs de base ---
     username  = serializers.CharField(max_length=50)
-    password  = serializers.CharField(write_only=True, min_length=4)
+    password  = serializers.CharField(write_only=True, min_length=8, max_length=12)
     nom       = serializers.CharField(max_length=100)
     prenom    = serializers.CharField(max_length=100)
     email     = serializers.EmailField()
@@ -193,6 +193,17 @@ class CreateUserSerializer(serializers.Serializer):
     )
 
     # ── Validations ──
+
+    def validate_password(self, value):
+        if len(value) < 8 or len(value) > 12:
+            raise serializers.ValidationError(
+                "Le mot de passe doit contenir entre 8 et 12 caractères."
+            )
+        if not any(c.isdigit() for c in value):
+            raise serializers.ValidationError(
+                "Le mot de passe doit contenir au moins un chiffre."
+            )
+        return value
 
     def validate_tel(self, value):
         return validate_algerian_phone(value)

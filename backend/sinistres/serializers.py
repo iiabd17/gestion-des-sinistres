@@ -15,7 +15,7 @@ Sérialiseurs DRF pour le système de gestion des sinistres.
 from rest_framework import serializers
 from .models import (
     Site, Sinistre, Equipement, PieceJointe, HistoriqueStatut,
-    NATURE_CHOICES, TYPE_PAR_NATURE, ALL_TYPE_CHOICES,
+    NATURE_CHOICES, TYPE_PAR_NATURE, ALL_TYPE_CHOICES, Notification
 )
 
 
@@ -29,6 +29,7 @@ class SiteSerializer(serializers.ModelSerializer):
         fields = [
             'codeSite', 'nomSite', 'region', 'wilaya',
             'commune', 'adresseSite', 'longitude', 'latitude',
+            'typeSite', 'owner',
         ]
 
 
@@ -227,3 +228,14 @@ class SinistreCreateSerializer(serializers.ModelSerializer):
         site = Site.objects.get(codeSite=code_site)
         validated_data['site'] = site
         return super().create(validated_data)
+
+
+# ═════════════════════════════════════════════
+#  NOTIFICATIONS
+# ═════════════════════════════════════════════
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'utilisateur', 'message', 'is_read', 'lien_action', 'dateCreation']
+        read_only_fields = ['id', 'utilisateur', 'dateCreation']

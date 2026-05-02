@@ -19,8 +19,9 @@ urlpatterns = [
     # ── Authentification utilitaire ──
     path('auth/status/',    views.CheckAuthStatusView.as_view(), name='auth-status'),
 
-    # ── Gestion des utilisateurs (Admin) ──
+    # ── Gestion des utilisateurs (Admin / Directrice Assurance) ──
     path('users/',                              views.ListUsersView.as_view(),        name='user-list'),
     path('users/create/',                       views.CreateUserView.as_view(),        name='user-create'),
     path('users/<int:user_id>/toggle-status/',  views.ToggleUserStatusView.as_view(),  name='user-toggle-status'),
+    path('users/<int:user_id>/',                views.DeleteUserView.as_view(),        name='user-delete'),
 ]

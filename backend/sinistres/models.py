@@ -357,3 +357,32 @@ class HistoriqueStatut(models.Model):
         verbose_name        = 'Historique de Statut'
         verbose_name_plural = 'Historiques de Statut'
         ordering            = ['-dateChangement']
+
+
+# ═════════════════════════════════════════════
+#  NOTIFICATIONS
+# ═════════════════════════════════════════════
+
+class Notification(models.Model):
+    """
+    Modèle pour gérer les notifications internes du système.
+    """
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        verbose_name='Destinataire'
+    )
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    lien_action = models.CharField(max_length=255, blank=True, null=True, help_text="Lien vers l'action ou le dossier")
+    dateCreation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notif vers {self.utilisateur} - Lu: {self.is_read}"
+
+    class Meta:
+        db_table = 'notification'
+        verbose_name = 'Notification'
+        verbose_name_plural = 'Notifications'
+        ordering = ['-dateCreation']

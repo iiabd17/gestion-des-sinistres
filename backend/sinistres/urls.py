@@ -21,6 +21,12 @@ urlpatterns = [
     path('sites/',
          views.SiteListCreateView.as_view(),
          name='site-list-create'),
+    path('sites/import/',
+         views.SiteImportCSVView.as_view(),
+         name='site-import'),
+    path('sites/export/',
+         views.SiteExportCSVView.as_view(),
+         name='site-export'),
     path('sites/<str:pk>/',
          views.SiteDetailView.as_view(),
          name='site-detail'),
@@ -82,6 +88,14 @@ urlpatterns = [
     path('pieces/<int:pk>/',
          views.PieceJointeDetailView.as_view(),
          name='piece-detail'),
+
+    # ── Notifications ──
+    path('notifications/',
+         views.NotificationListView.as_view(),
+         name='notification-list'),
+    path('notifications/<int:pk>/read/',
+         views.MarkNotificationReadView.as_view(),
+         name='notification-read'),
 
     # ── Statistiques (Dashboard) ──
     path('statistiques/',

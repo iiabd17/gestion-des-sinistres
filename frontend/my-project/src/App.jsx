@@ -15,6 +15,8 @@ import GestionDossiersPage from './Pages/GestionDossiers/GestionDossiersPage';
 import DossierGestionDetailPage from './Pages/GestionDossiers/DossierGestionDetailPage';
 import ArchivesPage from './Pages/Archives/ArchivesPage';
 import SettingsPage from './Pages/Settings/SettingsPage';
+import ProfilePage from './Pages/Profile/ProfilePage';
+import NotificationsPage from './Pages/Notifications/NotificationsPage';
 
 function App() {
   return (
@@ -25,9 +27,11 @@ function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Routes Protégées - Tout rôle connecté peut accéder au dashboard */}
+          {/* Routes Protégées - Tout rôle connecté peut accéder au dashboard, profil, notifs */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
           </Route>
 
           {/* Routes Équipe Terrain & Assurance */}
@@ -53,8 +57,8 @@ function App() {
             <Route path="/archives" element={<ArchivesPage />} />
           </Route>
 
-          {/* Routes Paramètres (Directrice Assurance / Admin) */}
-          <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'ADMIN']} />}>
+          {/* Routes Paramètres (Directrice Assurance / Admin / Ingénieur pour Équipements) */}
+          <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'ADMIN', 'INGENIEUR']} />}>
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

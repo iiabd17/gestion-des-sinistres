@@ -29,6 +29,7 @@ from django.db.models import Q
 from .models import (
     Site, Sinistre, Equipement, PieceJointe, HistoriqueStatut,
     NATURE_CHOICES, TYPE_PAR_NATURE, STATUT_CHOICES, URGENCE_CHOICES,
+    Notification
 )
 from .serializers import (
     SiteSerializer,
@@ -38,6 +39,7 @@ from .serializers import (
     EquipementSerializer,
     PieceJointeSerializer,
     HistoriqueStatutSerializer,
+    NotificationSerializer,
 )
 from accounts.permissions import (
     IsEquipeTerrain,
@@ -50,18 +52,30 @@ from accounts.permissions import (
 
 
 # ═════════════════════════════════════════════
-#  HELPER : Enregistrer un changement de statut
+#  HELPER : Enregistrer un changement de statut & Notifications
 # ═════════════════════════════════════════════
 
-def _log_changement_statut(sinistre, ancien, nouveau, user, commentaire=''):
-    """Crée une entrée dans le journal HistoriqueStatut."""
+def _log_changement_statut(sinistre, ancien, nouveau, modifie_par, commentaire=""):
     HistoriqueStatut.objects.create(
         sinistre=sinistre,
         ancienStatut=ancien,
         nouveauStatut=nouveau,
-        modifiePar=user,
+        modifiePar=modifie_par,
         commentaire=commentaire,
     )
+
+def _create_notification(destinataires, message, lien_action=None):
+    from django.db.models import QuerySet
+    if not destinataires: return
+    if isinstance(destinataires, QuerySet) or isinstance(destinataires, list):
+        notifs = [
+            Notification(utilisateur=u, message=message, lien_action=lien_action)
+            for u in destinataires if u is not None
+        ]
+        if notifs:
+            Notification.objects.bulk_create(notifs)
+    else:
+        Notification.objects.create(utilisateur=destinataires, message=message, lien_action=lien_action)
 
 
 # ═════════════════════════════════════════════
@@ -136,11 +150,11 @@ class ConstantsView(APIView):
 class SiteListCreateView(APIView):
     """
     GET  /api/sites/       → Liste tous les sites (tout utilisateur authentifié)
-    POST /api/sites/       → Crée un site (Assurance Directrice / Admin)
+    POST /api/sites/       → Crée un site (Assurance / Admin)
     """
     def get_permissions(self):
         if self.request.method == 'POST':
-            return [permissions.IsAuthenticated(), IsAssurance()]
+            return [permissions.IsAuthenticated(), IsEquipeTerrainOrAssurance()]
         return [permissions.IsAuthenticated()]
 
     def get(self, request):
@@ -151,7 +165,8 @@ class SiteListCreateView(APIView):
         if search:
             sites = sites.filter(
                 Q(codeSite__icontains=search) |
-                Q(nomSite__icontains=search)
+                Q(nomSite__icontains=search) |
+                Q(wilaya__icontains=search)
             )
 
         # Limiter les résultats pour l'autocomplete (26k+ sites en BDD)
@@ -177,7 +192,7 @@ class SiteDetailView(APIView):
     """
     def get_permissions(self):
         if self.request.method in ('PUT', 'DELETE'):
-            return [permissions.IsAuthenticated(), IsAssurance()]
+            return [permissions.IsAuthenticated(), IsEquipeTerrainOrAssurance()]
         return [permissions.IsAuthenticated()]
 
     def get(self, request, pk):
@@ -200,6 +215,127 @@ class SiteDetailView(APIView):
             {'message': 'Site supprimé.'},
             status=status.HTTP_204_NO_CONTENT,
         )
+
+
+class SiteImportCSVView(APIView):
+    """
+    POST /api/sites/import/
+    Importe des sites depuis un fichier CSV ou Excel (.xlsx).
+    Mapping des colonnes : S.Locality, Name, Owner, Region, Wilaya, Type, X, Y, Adresse, Commune
+    Accès : Assurance / Admin
+    """
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [permissions.IsAuthenticated, IsEquipeTerrainOrAssurance]
+
+    @transaction.atomic
+    def post(self, request):
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response(
+                {'error': 'Aucun fichier fourni. Utilisez le champ "file".'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        filename = file_obj.name.lower()
+        rows = []
+
+        try:
+            if filename.endswith('.xlsx'):
+                import openpyxl
+                from io import BytesIO
+                wb = openpyxl.load_workbook(BytesIO(file_obj.read()), data_only=True)
+                sheet = wb.active
+                headers = [str(cell.value).strip() if cell.value else '' for cell in sheet[1]]
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    if not any(row):
+                        continue
+                    row_dict = {k: str(v).strip() if v is not None else '' for k, v in zip(headers, row)}
+                    rows.append(row_dict)
+            else:
+                import csv, io
+                content = file_obj.read().decode('utf-8')
+                reader = csv.DictReader(io.StringIO(content))
+                for row in reader:
+                    rows.append(row)
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur de lecture du fichier : {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        sites_to_create = []
+        skipped = 0
+
+        for row_dict in rows:
+            code_site = row_dict.get('S.Locality', '').strip()
+            if not code_site:
+                skipped += 1
+                continue
+
+            x_val = row_dict.get('X', '').strip()
+            y_val = row_dict.get('Y', '').strip()
+
+            try:
+                longitude = float(x_val.replace(',', '.')) if x_val else None
+            except ValueError:
+                longitude = None
+            try:
+                latitude = float(y_val.replace(',', '.')) if y_val else None
+            except ValueError:
+                latitude = None
+
+            site = Site(
+                codeSite=code_site,
+                nomSite=row_dict.get('Name', '').strip(),
+                owner=row_dict.get('Owner', '').strip(),
+                region=row_dict.get('Region', '').strip(),
+                wilaya=row_dict.get('Wilaya', '').strip(),
+                typeSite=row_dict.get('Type', '').strip(),
+                longitude=longitude,
+                latitude=latitude,
+                adresseSite=row_dict.get('Adresse', '').strip(),
+                commune=row_dict.get('Commune', '').strip(),
+            )
+            sites_to_create.append(site)
+
+        if sites_to_create:
+            Site.objects.bulk_create(sites_to_create, ignore_conflicts=True)
+
+        return Response({
+            'message': f'{len(sites_to_create)} sites importés avec succès.',
+            'imported': len(sites_to_create),
+            'skipped': skipped,
+        }, status=status.HTTP_201_CREATED)
+
+class SiteExportCSVView(APIView):
+    """
+    GET /api/sites/export/
+    Exporte la liste des sites en CSV.
+    Accès : Assurance / Admin
+    """
+    permission_classes = [permissions.IsAuthenticated, IsEquipeTerrainOrAssurance]
+
+    def get(self, request):
+        import csv
+        from django.http import HttpResponse
+
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="sites_export.csv"'
+        
+        # Write BOM for Excel compatibility
+        response.write('\ufeff'.encode('utf8'))
+
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['S.Locality', 'Name', 'Owner', 'Region', 'Wilaya', 'Type', 'X', 'Y', 'Adresse', 'Commune'])
+
+        sites = Site.objects.all().values_list(
+            'codeSite', 'nomSite', 'owner', 'region', 'wilaya', 'typeSite', 'longitude', 'latitude', 'adresseSite', 'commune'
+        )
+
+        for site in sites:
+            writer.writerow(site)
+
+        return response
 
 
 # ═════════════════════════════════════════════
@@ -263,6 +399,23 @@ class SinistreListCreateView(APIView):
                 sinistre, '', 'OUVERT', request.user,
                 'Déclaration initiale du sinistre.'
             )
+
+            # --- Notifications ---
+            lien = f"/declarations/completer/{sinistre.idSinistre}"
+            
+            # 1. Informer le Directeur Assurance
+            from accounts.models import Assurance, Ingenieur, Legal
+            directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+            _create_notification(directeurs_assurance, f"Nouveau sinistre déclaré : {sinistre.idSinistre} ({sinistre.get_nature_display()}).", lien)
+            
+            # 2. Informer l'Ingénieur
+            ingenieurs = Ingenieur.objects.all()
+            _create_notification(ingenieurs, f"Besoin d'expertise pour le sinistre {sinistre.idSinistre}.", lien)
+            
+            # 3. Informer le rôle Legal si Vol ou Vandalisme
+            if sinistre.nature in ['VOL', 'ACTE_DE_SABOTAGE']:
+                legals = Legal.objects.all()
+                _create_notification(legals, f"Dossier juridique potentiel (Vol/Vandalisme) : {sinistre.idSinistre}.", lien)
 
             return Response(
                 SinistreDetailSerializer(sinistre).data,
@@ -379,6 +532,12 @@ class SinistreExpertiseView(APIView):
             sinistre, ancien_statut, 'EN_EXPERTISE', request.user,
             'Expertise technique complétée. Dossier transmis pour validation.'
         )
+
+        # 4. Informer le Directeur Assurance (Validation Finale)
+        from accounts.models import Assurance
+        directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+        lien = f"/gestion/{sinistre.idSinistre}"
+        _create_notification(directeurs_assurance, f"Expertise terminée pour {sinistre.idSinistre}. Le dossier est prêt pour la validation finale.", lien)
 
         return Response(SinistreDetailSerializer(sinistre).data)
 
@@ -897,3 +1056,37 @@ class StatistiquesView(APIView):
             'parNature':            par_nature,
             'montantTotalEstime':   montant_total,
         })
+
+
+# ═════════════════════════════════════════════
+#  NOTIFICATIONS
+# ═════════════════════════════════════════════
+
+class NotificationListView(APIView):
+    """
+    GET /api/notifications/
+    Retourne la liste des notifications pour l'utilisateur connecté.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(utilisateur=request.user)
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MarkNotificationReadView(APIView):
+    """
+    POST /api/notifications/<id>/read/
+    Marque une notification spécifique comme lue.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            notification = Notification.objects.get(pk=pk, utilisateur=request.user)
+            notification.is_read = True
+            notification.save()
+            return Response({"message": "Notification marquée comme lue"}, status=status.HTTP_200_OK)
+        except Notification.DoesNotExist:
+            return Response({"error": "Notification non trouvée"}, status=status.HTTP_404_NOT_FOUND)
