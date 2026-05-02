@@ -27,6 +27,7 @@ from .serializers import (
     UtilisateurSerializer,
     CreateUserSerializer,
     get_user_role,
+    CustomTokenObtainPairSerializer,
 )
 from .permissions import IsAdmin
 
@@ -234,3 +235,10 @@ class DeleteUserView(APIView):
         return Response({
             'message': f"Le compte de {nom_complet} a été supprimé.",
         }, status=status.HTTP_200_OK)
+
+
+from .serializers import CustomTokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer

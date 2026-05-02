@@ -290,20 +290,44 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        # La validation par défaut de `TokenObtainPairSerializer` utilise `authenticate()`
+        # de Django. Nous devons le surcharger pour permettre l'authentification
+        # avec l'email ou le username.
+        
+        # `attrs` contient `username` et `password`.
+        # Le champ `username` du formulaire peut contenir soit un email, soit un username.
+        user_identifier = attrs.get(self.username_field)
+        password = attrs.get('password')
+
+        user = None
+        
+        # Essayer de trouver l'utilisateur par email
+        if '@' in user_identifier:
+            try:
+                user_obj = Utilisateur.objects.get(email__iexact=user_identifier)
+                user = user_obj if user_obj.check_password(password) else None
+            except Utilisateur.DoesNotExist:
+                pass
+        
+        # Si non trouvé par email, essayer par username
+        if not user:
+            try:
+                user_obj = Utilisateur.objects.get(username__iexact=user_identifier)
+                user = user_obj if user_obj.check_password(password) else None
+            except Utilisateur.DoesNotExist:
+                pass
+
+        if not user or not user.is_active:
+            raise serializers.ValidationError("Aucun compte actif trouvé avec ces identifiants.")
+
+        # `super().validate()` s'occupe de générer le token si l'authentification réussit
+        # Nous devons lui passer l'utilisateur trouvé.
+        # Pour cela, on met à jour `attrs` avec le vrai username de l'utilisateur
+        attrs[self.username_field] = user.get_username()
+        
         data = super().validate(attrs)
-
-        # Vérifier le statut estActif
-        if not self.user.estActif:
-            raise serializers.ValidationError(
-                "Votre compte est désactivé. Contactez l'administrateur."
-            )
-
-        # Ajouter les infos utilisateur dans la réponse JSON (en plus du token)
-        data['user'] = {
-            'id':     self.user.id,
-            'nom':    self.user.nom,
-            'prenom': self.user.prenom,
-            'role':   get_user_role(self.user),
-        }
-
+        
+        # On peut ajouter des données supplémentaires à la réponse ici si besoin
+        # (en plus de ce qui est dans le token)
+        
         return data
