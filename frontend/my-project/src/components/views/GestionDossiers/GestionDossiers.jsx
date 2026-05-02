@@ -81,7 +81,7 @@ export default function GestionDossiers() {
               <p>Visualisez et gérez l'ensemble des sinistres en cours de traitement.</p>
             </div>
             <div className="gd-header-actions">
-              {['EQUIPE_TERRAIN', 'ASSURANCE', 'ADMIN'].includes(user?.role) && (
+              {['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN'].includes(user?.role) && (
                 <button className="gd-btn-red" onClick={() => navigate('/declarations/new')}>
                   <IconPlus />
                   Nouveau Sinistre
@@ -206,7 +206,7 @@ export default function GestionDossiers() {
         </main>
 
         {/* FAB */}
-        {['EQUIPE_TERRAIN', 'ASSURANCE', 'ADMIN'].includes(user?.role) && (
+        {['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN'].includes(user?.role) && (
           <button className="gd-fab" onClick={() => navigate('/declarations/new')}>
             <IconPlusLarge />
           </button>

@@ -35,7 +35,7 @@ function App() {
           </Route>
 
           {/* Routes Équipe Terrain & Assurance */}
-          <Route element={<ProtectedRoute allowedRoles={['EQUIPE_TERRAIN', 'ASSURANCE', 'ADMIN']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN']} />}>
             <Route path="/declarations/new" element={<NewDeclarationPage />} />
           </Route>
 

@@ -1,43 +1,201 @@
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
+import api from '../../../api'
+import { toast } from 'react-toastify'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 import './DossierGestionDetail.css'
-
-/* ── Mock Data for Details ──────────────────────────── */
-const dossierData = {
-  'CLM-2024-8842': {
-    title: 'Sinistre Site BTS-042',
-    lastUpdate: 'Il y a 14 minutes par Système',
-    nature: 'Vandalisme & Vol de Câbles',
-    date: '14 Mars 2024 • 02:45',
-    site: 'Wilaya d’Alger (BTS-042)',
-    progression: [
-      { id: '1', label: 'DÉCLARÉ', date: '14 Mars', status: 'completed' },
-      { id: '2', label: 'ROUTAGE', date: '15 Mars', status: 'completed' },
-      { id: '3', label: 'EXPERTISE', date: '18 Mars', status: 'completed' },
-      { id: '4', label: 'DÉCISION', date: 'En cours', status: 'active' },
-      { id: '5', label: 'CLÔTURE', date: '...', status: 'locked' }
-    ],
-    fichiers: [
-      { name: 'PV_Police_Alger_Si...', meta: 'PDF • 2.4 MB • 14 Mars 2024', icon: IconFileText },
-      { name: 'Photo_Dommages_...', meta: 'JPG • 4.8 MB • 14 Mars 2024', icon: IconImage },
-      { name: 'Devis_Reparation_...', meta: 'DOCX • 1.1 MB • 16 Mars 2024', icon: IconWord },
-      { name: 'Inventaire_Materiel...', meta: 'XLSX • 840 KB • 15 Mars 2024', icon: IconExcel }
-    ],
-    finance: {
-      cout: '450.000',
-      progress: 75,
-      seuil: '600.000 DZD'
-    },
-    routage: 'Dossier Transmis à l’Assureur'
-  }
-}
 
 export default function DossierGestionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   
-  // Normalize ID for lookup
-  const data = dossierData[id] || dossierData['CLM-2024-8842']
+  const [data, setData] = useState(null)
+  const [statuts, setStatuts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const fileInputRef = useRef(null)
+  const contentRef = useRef(null)
+
+  useEffect(() => {
+    // Load constants for status dropdown
+    api.get('/constants/')
+      .then(res => setStatuts(res.data.statuts || []))
+      .catch(() => {})
+
+    // Load dossier
+    api.get(`/sinistres/${id}/`)
+      .then(res => setData(res.data))
+      .catch(err => {
+        toast.error('Erreur de chargement du dossier')
+        console.error(err)
+      })
+      .finally(() => setLoading(false))
+  }, [id])
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    const formData = new FormData()
+    formData.append('fichier', file)
+    formData.append('titreDoc', file.name)
+    formData.append('typePiece', 'AUTRE')
+
+    try {
+      const res = await api.post(`/sinistres/${id}/pieces/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      toast.success('Document ajouté avec succès')
+      setData(prev => ({ 
+        ...prev, 
+        piecesJointes: [...(prev.piecesJointes || []), res.data] 
+      }))
+    } catch (err) {
+      toast.error('Erreur lors de l\'ajout du document')
+    }
+  }
+
+  const handleStatutChange = async (e) => {
+    const newStatut = e.target.value
+    try {
+      await api.put(`/sinistres/${id}/`, { statut: newStatut })
+      setData(prev => ({ 
+        ...prev, 
+        statut: newStatut, 
+        statut_label: statuts.find(s => s.code === newStatut)?.label || newStatut 
+      }))
+      toast.success('Statut mis à jour')
+    } catch (err) {
+      toast.error('Erreur lors de la mise à jour du statut')
+    }
+  }
+
+  const exportPDF = async () => {
+    try {
+      toast.info('Génération du PDF en cours...')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      let y = 20
+
+      // Title
+      pdf.setFontSize(22)
+      pdf.setTextColor(226, 0, 15) // Djezzy Red
+      pdf.text(`Dossier Sinistre: #${id}`, 20, y)
+      y += 10
+      
+      pdf.setFontSize(11)
+      pdf.setTextColor(113, 128, 150) // Gray
+      pdf.text(`Déclaré le : ${new Date(data.dateCreation).toLocaleDateString('fr-FR')}`, 20, y)
+      y += 15
+
+      // Informations section
+      pdf.setFontSize(16)
+      pdf.setTextColor(26, 32, 44) // Dark
+      pdf.text("Informations de l'incident", 20, y)
+      y += 10
+      
+      pdf.setFontSize(12)
+      pdf.setTextColor(74, 85, 104)
+      const infos = [
+        `Type de sinistre : ${data.typeSinistre_label || data.nature_label || ''}`,
+        `Date de l'événement : ${new Date(data.dateSurvenance).toLocaleDateString('fr-FR')} ${data.heureSurvenance ? data.heureSurvenance : ''}`,
+        `Site concerné : ${data.site_detail?.wilaya || ''} (${data.site_detail?.codeSite || ''})`,
+        `Coût estimé des dommages : ${parseFloat(data.montantEstime || 0).toLocaleString('fr-FR')} DZD`,
+        `Statut actuel : ${data.statut_label || data.statut || ''}`
+      ]
+
+      infos.forEach(info => {
+        pdf.text(info, 20, y)
+        y += 8
+      })
+      
+      y += 10
+
+      // Images associated
+      const imagePieces = (data.piecesJointes || []).filter(p => p.fichier && (p.fichier.toLowerCase().endsWith('.jpg') || p.fichier.toLowerCase().endsWith('.jpeg') || p.fichier.toLowerCase().endsWith('.png')))
+      
+      if (imagePieces.length > 0) {
+        pdf.setFontSize(16)
+        pdf.setTextColor(26, 32, 44)
+        pdf.text('Images associées', 20, y)
+        y += 10
+        
+        for (const piece of imagePieces) {
+          try {
+            const imgUrl = piece.fichier.startsWith('http') ? piece.fichier : `http://localhost:8000${piece.fichier}`
+            
+            // Load image as base64
+            const imgData = await new Promise((resolve, reject) => {
+              const img = new Image()
+              img.crossOrigin = 'Anonymous'
+              img.onload = () => {
+                const canvas = document.createElement('canvas')
+                canvas.width = img.width
+                canvas.height = img.height
+                const ctx = canvas.getContext('2d')
+                ctx.drawImage(img, 0, 0)
+                resolve(canvas.toDataURL('image/jpeg', 0.8))
+              }
+              img.onerror = reject
+              img.src = imgUrl
+            })
+            
+            // Check if we need a new page
+            if (y + 90 > 280) {
+              pdf.addPage()
+              y = 20
+            }
+            
+            pdf.setFontSize(10)
+            pdf.setTextColor(113, 128, 150)
+            pdf.text(piece.titreDoc || 'Image', 20, y)
+            y += 5
+            
+            // Fixed height 80, calculate width based on ratio, max 170
+            pdf.addImage(imgData, 'JPEG', 20, y, 170, 80, undefined, 'FAST')
+            y += 90
+            
+          } catch (e) {
+            console.error("Impossible de charger l'image pour le PDF", e)
+          }
+        }
+      }
+
+      pdf.save(`Dossier_${id}.pdf`)
+      toast.success('PDF téléchargé avec succès')
+    } catch (err) {
+      toast.error("Erreur lors de l'export PDF")
+      console.error(err)
+    }
+  }
+
+  if (loading) return (
+    <div className="dg-layout">
+      <Sidebar />
+      <div className="dg-main" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <p style={{color: '#94A3B8'}}>Chargement...</p>
+      </div>
+    </div>
+  )
+
+  if (!data) return (
+    <div className="dg-layout">
+      <Sidebar />
+      <div className="dg-main" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <p style={{color: '#E2000F'}}>Dossier introuvable</p>
+      </div>
+    </div>
+  )
+
+  // Calcs
+  const title = `Sinistre ${data.site_detail?.codeSite || ''}`
+  const lastUpdate = `Déclaré le : ${new Date(data.dateCreation).toLocaleDateString('fr-FR')}`
+  const pieces = data.piecesJointes || []
+  
+  const cout = parseFloat(data.montantEstime || 0)
+  const seuil = 600000 // Arbitrary seuil for UI
+  const progress = Math.min((cout / seuil) * 100, 100).toFixed(0)
 
   return (
     <div className="dg-layout">
@@ -52,24 +210,28 @@ export default function DossierGestionDetail() {
           </div>
         </header>
 
-        <main className="dg-content">
+        <main className="dg-content" ref={contentRef}>
           {/* Breadcrumbs */}
           <nav className="dg-breadcrumbs">
             <span>Dossiers</span>
             <span className="dg-bc-sep">›</span>
-            <span className="dg-bc-id">#{id || 'CLM-2024-8842'}</span>
+            <span className="dg-bc-id">#{id}</span>
           </nav>
 
           {/* Header */}
           <section className="dg-page-header">
             <div className="dg-title-group">
-              <h1>{data.title}</h1>
-              <p>Dernière mise à jour : {data.lastUpdate}</p>
+              <h1>{title}</h1>
+              <p>{lastUpdate}</p>
             </div>
             <div className="dg-header-actions">
-              <button className="dg-btn dg-btn-white"><IconEdit /> Modifier</button>
-              <button className="dg-btn dg-btn-white"><IconDownload /> Export PDF</button>
-              <button className="dg-btn dg-btn-red">Fermer le Dossier</button>
+              <button className="dg-btn dg-btn-white" onClick={() => setIsEditing(!isEditing)}>
+                <IconEdit /> {isEditing ? 'Terminer' : 'Modifier'}
+              </button>
+              <button className="dg-btn dg-btn-white" onClick={exportPDF}>
+                <IconDownload /> Export PDF
+              </button>
+              <button className="dg-btn dg-btn-red" onClick={() => navigate('/gestion')}>Fermer</button>
             </div>
           </section>
 
@@ -86,38 +248,21 @@ export default function DossierGestionDetail() {
                 <div className="dg-info-row">
                   <div className="dg-info-field">
                     <label>TYPE DE SINISTRE</label>
-                    <span className="dg-info-val">{data.nature}</span>
+                    <span className="dg-info-val">{data.typeSinistre_label || data.nature_label}</span>
                   </div>
                   <div className="dg-info-field">
                     <label>DATE DE L’ÉVÉNEMENT</label>
-                    <span className="dg-info-val">{data.date}</span>
+                    <span className="dg-info-val">
+                      {new Date(data.dateSurvenance).toLocaleDateString('fr-FR')} {data.heureSurvenance ? `• ${data.heureSurvenance}` : ''}
+                    </span>
                   </div>
                   <div className="dg-info-field">
                     <label>SITE CONCERNÉ</label>
-                    <span className="dg-info-val" style={{ borderBottom: '1px dashed #cbd5e0' }}>{data.site}</span>
+                    <span className="dg-info-val" style={{ borderBottom: '1px dashed #cbd5e0' }}>
+                      {data.site_detail?.wilaya ? `${data.site_detail.wilaya} ` : ''} 
+                      {data.site_detail?.codeSite ? `(${data.site_detail.codeSite})` : ''}
+                    </span>
                   </div>
-                </div>
-              </div>
-
-              {/* Progression section */}
-              <div className="dg-card">
-                <div className="dg-card-header">
-                  <IconTrendingUp className="dg-card-icon" />
-                  <h2 className="dg-card-title">Progression du Dossier</h2>
-                </div>
-                <div className="dg-stepper">
-                  <div className="dg-step-connector">
-                    <div className="dg-step-connector-progress" style={{ width: '75%' }} />
-                  </div>
-                  {data.progression.map((step, index) => (
-                    <div key={step.id} className={`dg-step dg-step--${step.status}`}>
-                      <div className="dg-step-point">
-                        {step.status === 'completed' ? <IconCheck /> : (step.status === 'locked' ? <IconLockSmall /> : <IconZap />)}
-                      </div>
-                      <span className="dg-step-label">{step.label}</span>
-                      <span className="dg-step-date">{step.date}</span>
-                    </div>
-                  ))}
                 </div>
               </div>
 
@@ -128,17 +273,39 @@ export default function DossierGestionDetail() {
                     <IconPaperclip className="dg-card-icon" />
                     <h2 className="dg-card-title">Pièces Jointes</h2>
                   </div>
-                  <button style={{ background: 'none', border: 'none', color: '#E2000F', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>+ Ajouter un document</button>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ background: 'none', border: 'none', color: '#E2000F', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    + Ajouter un document
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    style={{ display: 'none' }} 
+                    onChange={handleFileUpload} 
+                  />
                 </div>
                 <div className="dg-pj-grid">
-                  {data.fichiers.map((file, i) => (
+                  {pieces.length === 0 ? (
+                    <p style={{ color: '#94A3B8', fontSize: '0.9rem', gridColumn: '1 / -1' }}>Aucune pièce jointe.</p>
+                  ) : pieces.map((file, i) => (
                     <div key={i} className="dg-pj-card">
-                      <div className="dg-pj-icon"><file.icon /></div>
+                      <div className="dg-pj-icon"><IconFileText /></div>
                       <div className="dg-pj-info">
-                        <span className="dg-pj-name">{file.name}</span>
-                        <span className="dg-pj-meta">{file.meta}</span>
+                        <span className="dg-pj-name">{file.titreDoc || `Document ${i+1}`}</span>
+                        <span className="dg-pj-meta">
+                          {new Date(file.dateUpload).toLocaleDateString('fr-FR')}
+                        </span>
                       </div>
-                      <IconDownloadCloud className="dg-pj-dl" />
+                      <a 
+                        href={file.fichier?.startsWith('http') ? file.fichier : `http://localhost:8000${file.fichier}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{color: 'inherit'}}
+                      >
+                        <IconDownloadCloud className="dg-pj-dl" />
+                      </a>
                     </div>
                   ))}
                 </div>
@@ -155,14 +322,14 @@ export default function DossierGestionDetail() {
                 <div className="dg-fin-val-group">
                   <span className="dg-fin-label">Coût Estimé des Dommages</span>
                   <div className="dg-fin-amount">
-                    {data.finance.cout} <span className="dg-fin-currency">DZD</span>
+                    {cout.toLocaleString('fr-FR')} <span className="dg-fin-currency">DZD</span>
                   </div>
                 </div>
                 <div className="dg-progress-container">
                   <div className="dg-progress-bar">
-                    <div className="dg-progress-fill" style={{ width: `${data.finance.progress}%` }} />
+                    <div className="dg-progress-fill" style={{ width: `${progress}%` }} />
                   </div>
-                  <span className="dg-progress-text">{data.finance.progress}% du Seuil</span>
+                  <span className="dg-progress-text">{progress}% du Seuil</span>
                 </div>
                 <div className="dg-threshold-box">
                   <div className="dg-threshold-info">
@@ -170,7 +337,7 @@ export default function DossierGestionDetail() {
                   </div>
                   <div>
                     <span className="dg-fin-label" style={{ marginBottom: 0 }}>Seuil de Franchise</span>
-                    <div className="dg-threshold-val">{data.finance.seuil}</div>
+                    <div className="dg-threshold-val">{(seuil).toLocaleString('fr-FR')} DZD</div>
                   </div>
                   <IconAlertBox />
                 </div>
@@ -184,7 +351,43 @@ export default function DossierGestionDetail() {
                 </div>
                 <div className="dg-routing-status-box">
                   <span className="dg-rs-label">STATUT ACTUEL</span>
-                  <span className="dg-rs-val">{data.routage}</span>
+                  
+                  {!isEditing ? (
+                    <div style={{ 
+                      marginTop: '8px', 
+                      fontSize: '1.25rem', 
+                      fontWeight: 'bold', 
+                      color: '#fff',
+                      padding: '4px 0'
+                    }}>
+                      {data.statut_label}
+                    </div>
+                  ) : (
+                    <select 
+                      className="gd-select" 
+                      value={data.statut} 
+                      onChange={handleStatutChange}
+                      style={{ 
+                        marginTop: '8px', 
+                        width: '100%', 
+                        padding: '10px', 
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        background: 'rgba(255,255,255,0.1)',
+                        color: '#fff',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      {statuts.map(s => (
+                        <option key={s.code} value={s.code} style={{color: '#1a202c'}}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 

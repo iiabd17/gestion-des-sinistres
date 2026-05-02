@@ -138,13 +138,6 @@ export default function Settings() {
       .catch(err => toast.error(err.response?.data ? JSON.stringify(err.response.data) : "Erreur"))
   }
 
-  const handleDeleteUser = (id, name) => {
-    if (!window.confirm(`Supprimer le compte de ${name} ?`)) return
-    api.delete(`/accounts/users/${id}/`)
-      .then(r => { toast.success(r.data.message); setUsers(u => u.filter(x => x.id !== id)) })
-      .catch(err => toast.error(err.response?.data?.message || "Erreur"))
-  }
-
   const handleToggleUser = (id) => {
     api.patch(`/accounts/users/${id}/toggle-status/`)
       .then(r => { toast.success(r.data.message); setUsers(u => u.map(x => x.id === id ? { ...x, estActif: r.data.estActif } : x)) })
@@ -294,9 +287,8 @@ export default function Settings() {
                             <span className="st-status-dot" /> {u.estActif ? 'Actif' : 'Inactif'}
                           </span>
                         </td>
-                        <td style={{display:'flex',gap:6}}>
+                        <td>
                           <button className="st-toggle-btn" onClick={()=>handleToggleUser(u.id)} title={u.estActif?'Désactiver':'Activer'}>{u.estActif?'⏸':'▶'}</button>
-                          <button className="st-del-btn" onClick={()=>handleDeleteUser(u.id,`${u.nom} ${u.prenom}`)} title="Supprimer">✕</button>
                         </td>
                       </tr>
                     ))}</tbody>
