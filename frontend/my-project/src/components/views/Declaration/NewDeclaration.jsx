@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import AsyncSelect from 'react-select/async'
 import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
+import { AuthContext } from '../../../context/AuthContext'
 import './NewDeclaration.css'
 
 const incidentCategories = [
@@ -77,6 +78,7 @@ const incidentCategories = [
 export default function NewDeclaration() {
   const navigate = useNavigate()
   const fileInput = useRef(null)
+  const { user, unreadNotifsCount } = useContext(AuthContext)
 
   const [type, setType]        = useState('')
   const [date, setDate]        = useState('')
@@ -227,11 +229,11 @@ export default function NewDeclaration() {
         {/* Top bar */}
         <header className="nd-topbar">
           <div className="nd-topbar-actions">
-            <button className="nd-icon-btn" aria-label="Notifications">
+            <button className="nd-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
               <IconBell />
-              <span className="nd-notif-dot" />
+              {unreadNotifsCount > 0 && <span className="nd-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
             </button>
-            <button className="nd-icon-btn" aria-label="Profil">
+            <button className="nd-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
               <IconUser />
             </button>
           </div>

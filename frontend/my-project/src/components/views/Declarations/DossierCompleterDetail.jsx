@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useContext } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
+import { AuthContext } from '../../../context/AuthContext'
 import './DossierValidation.css'
 import './DossierCompleterDetail.css'
 
@@ -23,6 +24,7 @@ const EMPTY_EQUIP = { nomMarque: '', quantiteImpactee: 1, valeurComptable: 0 }
 export default function DossierCompleterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user, unreadNotifsCount } = useContext(AuthContext)
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -145,11 +147,11 @@ export default function DossierCompleterDetail() {
         {/* Topbar */}
         <header className="dv-topbar">
           <div className="dv-topbar-actions">
-            <button className="dv-icon-btn" aria-label="Notifications">
+            <button className="dv-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
               <IconBell />
-              <span className="dv-notif-dot" />
+              {unreadNotifsCount > 0 && <span className="dv-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
             </button>
-            <button className="dv-icon-btn" aria-label="Profil">
+            <button className="dv-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
               <IconUser />
             </button>
           </div>

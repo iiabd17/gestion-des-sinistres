@@ -92,6 +92,24 @@ class UtilisateurSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        role = self.get_role(instance)
+        if role == 'EQUIPE_TERRAIN' and hasattr(instance, 'equipeterrain'):
+            ret['departement'] = instance.equipeterrain.departement
+            ret['fonction'] = instance.equipeterrain.fonction
+            ret['matricule'] = instance.equipeterrain.matricule
+        elif role == 'INGENIEUR' and hasattr(instance, 'ingenieur'):
+            ret['specialite'] = instance.ingenieur.specialite
+            ret['matriculeTechnique'] = instance.ingenieur.matriculeTechnique
+        elif role == 'LEGAL' and hasattr(instance, 'legal'):
+            ret['division'] = instance.legal.division
+        elif role == 'HSE' and hasattr(instance, 'hse'):
+            ret['zoneIntervention'] = instance.hse.zoneIntervention
+        elif role == 'ASSURANCE' and hasattr(instance, 'assurance'):
+            ret['role_assurance'] = instance.assurance.role
+        return ret
+
     def get_role(self, obj):
         return get_user_role(obj)
 
@@ -119,7 +137,7 @@ class IngenieurSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ingenieur
-        fields = ['id', 'username', 'nom', 'prenom', 'tel', 'email', 'estActif', 'role']
+        fields = ['id', 'username', 'nom', 'prenom', 'tel', 'email', 'estActif', 'specialite', 'matriculeTechnique', 'role']
 
     def get_role(self, obj):
         return 'INGENIEUR'
@@ -130,7 +148,7 @@ class LegalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Legal
-        fields = ['id', 'username', 'nom', 'prenom', 'tel', 'email', 'estActif', 'role']
+        fields = ['id', 'username', 'nom', 'prenom', 'tel', 'email', 'estActif', 'division', 'role']
 
     def get_role(self, obj):
         return 'LEGAL'
@@ -141,7 +159,7 @@ class HseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Hse
-        fields = ['id', 'username', 'nom', 'prenom', 'tel', 'email', 'estActif', 'role']
+        fields = ['id', 'username', 'nom', 'prenom', 'tel', 'email', 'estActif', 'zoneIntervention', 'role']
 
     def get_role(self, obj):
         return 'HSE'
@@ -185,6 +203,16 @@ class CreateUserSerializer(serializers.Serializer):
     departement = serializers.CharField(max_length=100, required=False, allow_blank=True)
     fonction    = serializers.CharField(max_length=100, required=False, allow_blank=True)
     matricule   = serializers.CharField(max_length=50,  required=False, allow_blank=True)
+
+    # --- Champs spécifiques Ingenieur ---
+    specialite = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    matriculeTechnique = serializers.CharField(max_length=50, required=False, allow_blank=True)
+
+    # --- Champs spécifiques Legal ---
+    division = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    # --- Champs spécifiques Hse ---
+    zoneIntervention = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
     # --- Champs spécifiques Assurance ---
     role_assurance = serializers.ChoiceField(
@@ -237,6 +265,10 @@ class CreateUserSerializer(serializers.Serializer):
         departement    = validated_data.pop('departement', '')
         fonction       = validated_data.pop('fonction', '')
         matricule      = validated_data.pop('matricule', '')
+        specialite     = validated_data.pop('specialite', '')
+        matriculeTechnique = validated_data.pop('matriculeTechnique', '')
+        division       = validated_data.pop('division', '')
+        zoneIntervention = validated_data.pop('zoneIntervention', '')
         role_assurance = validated_data.pop('role_assurance', None)
         password       = validated_data.pop('password')
 
@@ -246,11 +278,11 @@ class CreateUserSerializer(serializers.Serializer):
         if role == 'EQUIPE_TERRAIN':
             user = EquipeTerrain(**validated_data, departement=departement, fonction=fonction, matricule=matricule)
         elif role == 'INGENIEUR':
-            user = Ingenieur(**validated_data)
+            user = Ingenieur(**validated_data, specialite=specialite, matriculeTechnique=matriculeTechnique)
         elif role == 'LEGAL':
-            user = Legal(**validated_data)
+            user = Legal(**validated_data, division=division)
         elif role == 'HSE':
-            user = Hse(**validated_data)
+            user = Hse(**validated_data, zoneIntervention=zoneIntervention)
         elif role == 'ASSURANCE':
             user = Assurance(**validated_data, role=role_assurance)
         elif role == 'ADMIN':

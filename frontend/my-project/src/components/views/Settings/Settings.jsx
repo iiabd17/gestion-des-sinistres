@@ -41,7 +41,7 @@ export default function Settings() {
   // ── Comptes ──
   const [users, setUsers] = useState([])
   const [loadingUsers, setLoadingUsers] = useState(true)
-  const [userForm, setUserForm] = useState({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role:'INGENIEUR', role_assurance:'AGENT' })
+  const [userForm, setUserForm] = useState({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role:'INGENIEUR', role_assurance:'AGENT', specialite:'', matriculeTechnique:'', departement:'', fonction:'', matricule:'', division:'', zoneIntervention:'' })
 
   // ── Équipements ──
   const [eqForm, setEqForm] = useState({ nomMarque:'', numeroSerie:'', quantiteImpactee:'', valeurComptable:'' })
@@ -64,6 +64,21 @@ export default function Settings() {
       .then(r => setUsers(Array.isArray(r.data) ? r.data : []))
       .catch(() => toast.error("Impossible de charger les utilisateurs."))
       .finally(() => setLoadingUsers(false))
+  }, [activeTab])
+
+  // ── Franchises ──
+  const [franchises, setFranchises] = useState([])
+  const [loadingFranchises, setLoadingFranchises] = useState(false)
+  const [editingFranchise, setEditingFranchise] = useState(null) // { nature, montant }
+
+  // Load franchises
+  useEffect(() => {
+    if (activeTab !== 'franchises' || !isAdmin) return
+    setLoadingFranchises(true)
+    api.get('/franchises/')
+      .then(r => setFranchises(Array.isArray(r.data) ? r.data : []))
+      .catch(() => toast.error("Impossible de charger les franchises."))
+      .finally(() => setLoadingFranchises(false))
   }, [activeTab])
 
   // ── Handlers ──
@@ -128,10 +143,15 @@ export default function Settings() {
     if (!userForm.nom || !userForm.email || !userForm.username) return toast.error('Champs obligatoires manquants.')
     const payload = { ...userForm }
     if (payload.role !== 'ASSURANCE') delete payload.role_assurance
+    if (payload.role !== 'INGENIEUR') { delete payload.specialite; delete payload.matriculeTechnique; }
+    if (payload.role !== 'EQUIPE_TERRAIN') { delete payload.departement; delete payload.fonction; delete payload.matricule; }
+    if (payload.role !== 'LEGAL') delete payload.division
+    if (payload.role !== 'HSE') delete payload.zoneIntervention
+
     api.post('/accounts/users/create/', payload)
       .then(r => { 
         toast.success(r.data.message); 
-        setUserForm({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role:'INGENIEUR', role_assurance:'AGENT' }); 
+        setUserForm({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role:'INGENIEUR', role_assurance:'AGENT', specialite:'', matriculeTechnique:'', departement:'', fonction:'', matricule:'', division:'', zoneIntervention:'' }); 
         setUsers(u => [r.data.user, ...u]);
         setShowAddUserForm(false);
       })
@@ -142,6 +162,17 @@ export default function Settings() {
     api.patch(`/accounts/users/${id}/toggle-status/`)
       .then(r => { toast.success(r.data.message); setUsers(u => u.map(x => x.id === id ? { ...x, estActif: r.data.estActif } : x)) })
       .catch(err => toast.error(err.response?.data?.message || "Erreur"))
+  }
+
+  const handleUpdateFranchise = (nature, montant) => {
+    if (montant < 0 || isNaN(montant)) return toast.error("Montant invalide")
+    api.put(`/franchises/${nature}/`, { montant })
+      .then(r => {
+        toast.success("Franchise mise à jour")
+        setFranchises(f => f.map(x => x.nature === nature ? r.data : x))
+        setEditingFranchise(null)
+      })
+      .catch(() => toast.error("Erreur lors de la mise à jour"))
   }
 
   const handleAddEquipement = (e) => {
@@ -178,6 +209,7 @@ export default function Settings() {
           <div className="st-tabs">
             {isAdmin && <button className={`st-tab ${activeTab==='sites'?'st-tab--active':''}`} onClick={()=>setActiveTab('sites')}><IconTower /> Sites</button>}
             {isAdmin && <button className={`st-tab ${activeTab==='comptes'?'st-tab--active':''}`} onClick={()=>setActiveTab('comptes')}><IconUserPlus /> Comptes</button>}
+            {isAdmin && <button className={`st-tab ${activeTab==='franchises'?'st-tab--active':''}`} onClick={()=>setActiveTab('franchises')}><IconShield /> Franchises</button>}
             {canEquip && <button className={`st-tab ${activeTab==='equipements'?'st-tab--active':''}`} onClick={()=>setActiveTab('equipements')}><IconCpu /> Équipements</button>}
           </div>
 
@@ -267,6 +299,25 @@ export default function Settings() {
                         </select>
                       </div>
                     )}
+                    {userForm.role==='INGENIEUR' && (
+                      <>
+                        <div className="st-field"><label>SPÉCIALITÉ</label><input className="st-input" placeholder="Ex: Électrique" value={userForm.specialite} onChange={e=>uf('specialite',e.target.value)} /></div>
+                        <div className="st-field"><label>MATRICULE TECHNIQUE</label><input className="st-input" placeholder="Ex: ING-2023-01" value={userForm.matriculeTechnique} onChange={e=>uf('matriculeTechnique',e.target.value)} /></div>
+                      </>
+                    )}
+                    {userForm.role==='EQUIPE_TERRAIN' && (
+                      <>
+                        <div className="st-field"><label>MATRICULE</label><input className="st-input" placeholder="Ex: M12345" value={userForm.matricule} onChange={e=>uf('matricule',e.target.value)} /></div>
+                        <div className="st-field"><label>DÉPARTEMENT</label><input className="st-input" placeholder="Ex: Réseau" value={userForm.departement} onChange={e=>uf('departement',e.target.value)} /></div>
+                        <div className="st-field"><label>FONCTION</label><input className="st-input" placeholder="Ex: Technicien" value={userForm.fonction} onChange={e=>uf('fonction',e.target.value)} /></div>
+                      </>
+                    )}
+                    {userForm.role==='LEGAL' && (
+                      <div className="st-field"><label>DIVISION</label><input className="st-input" placeholder="Ex: Contentieux" value={userForm.division} onChange={e=>uf('division',e.target.value)} /></div>
+                    )}
+                    {userForm.role==='HSE' && (
+                      <div className="st-field"><label>ZONE D'INTERVENTION</label><input className="st-input" placeholder="Ex: Alger Centre" value={userForm.zoneIntervention} onChange={e=>uf('zoneIntervention',e.target.value)} /></div>
+                    )}
                   </div>
                   <button type="submit" className="st-btn-submit"><IconUserPlus /> Créer le Compte</button>
                 </form>
@@ -296,6 +347,58 @@ export default function Settings() {
                 )}
               </div>
 
+            </section>
+          )}
+
+          {/* ═══ TAB FRANCHISES ═══ */}
+          {activeTab==='franchises' && isAdmin && (
+            <section className="st-card">
+              <div className="st-section-head" style={{ alignItems: 'flex-start' }}>
+                <div className="st-section-title"><h2>Gestion des Franchises</h2><p>Définissez les montants déductibles par nature de sinistre. Les montants à 0 désactivent la vérification.</p></div>
+              </div>
+
+              <div className="st-table-wrap">
+                {loadingFranchises ? <p className="st-empty">Chargement...</p> : franchises.length===0 ? <p className="st-empty">Aucune franchise.</p> : (
+                  <table className="st-table">
+                    <thead><tr><th>NATURE</th><th>MONTANT DE LA FRANCHISE (DA)</th><th>DERNIÈRE MODIF.</th><th>MODIFIÉ PAR</th><th>ACTIONS</th></tr></thead>
+                    <tbody>{franchises.map(f=>(
+                      <tr key={f.id}>
+                        <td style={{fontWeight:600}}>{f.nature_label}</td>
+                        <td>
+                          {editingFranchise?.nature === f.nature ? (
+                            <input 
+                              type="number" 
+                              className="st-input" 
+                              value={editingFranchise.montant} 
+                              onChange={(e) => setEditingFranchise({...editingFranchise, montant: e.target.value})}
+                              autoFocus
+                              style={{ width: '150px' }}
+                            />
+                          ) : (
+                            <span style={{color: f.montant > 0 ? '#E2000F' : '#64748b', fontWeight: f.montant > 0 ? '700' : '400'}}>
+                              {f.montant > 0 ? f.montant.toLocaleString('fr-FR') : 'Aucune (0)'}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{color:'#64748b',fontSize:13}}>
+                          {new Date(f.date_modification).toLocaleDateString('fr-FR')} à {new Date(f.date_modification).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}
+                        </td>
+                        <td style={{color:'#64748b',fontSize:13}}>{f.modifie_par_nom || '—'}</td>
+                        <td>
+                          {editingFranchise?.nature === f.nature ? (
+                            <div style={{display:'flex', gap:'8px'}}>
+                              <button className="st-btn-submit" style={{padding:'4px 12px'}} onClick={() => handleUpdateFranchise(f.nature, parseFloat(editingFranchise.montant))}>Enregistrer</button>
+                              <button className="st-btn-white" style={{padding:'4px 12px'}} onClick={() => setEditingFranchise(null)}>Annuler</button>
+                            </div>
+                          ) : (
+                            <button className="st-btn-white" style={{padding:'4px 12px'}} onClick={() => setEditingFranchise({ nature: f.nature, montant: f.montant })}>Modifier</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </div>
             </section>
           )}
 
@@ -372,3 +475,4 @@ function IconInfo(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 function IconBell(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20}}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}
 function IconUserC(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20}}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="9" r="3"/><path d="M6.17 18.34A4 4 0 0 1 10 16h4a4 4 0 0 1 3.83 2.34"/></svg>}
 function IconAlertTriangle() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:28,height:28}}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>; }
+function IconShield() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18}}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>; }

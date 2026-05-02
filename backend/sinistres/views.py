@@ -64,18 +64,18 @@ def _log_changement_statut(sinistre, ancien, nouveau, modifie_par, commentaire="
         commentaire=commentaire,
     )
 
-def _create_notification(destinataires, message, lien_action=None):
+def _create_notification(destinataires, message, lien_action=None, expediteur=None, sinistre_id=None):
     from django.db.models import QuerySet
     if not destinataires: return
     if isinstance(destinataires, QuerySet) or isinstance(destinataires, list):
         notifs = [
-            Notification(utilisateur=u, message=message, lien_action=lien_action)
+            Notification(utilisateur=u, message=message, lien_action=lien_action, expediteur=expediteur, sinistre_id=sinistre_id)
             for u in destinataires if u is not None
         ]
         if notifs:
             Notification.objects.bulk_create(notifs)
     else:
-        Notification.objects.create(utilisateur=destinataires, message=message, lien_action=lien_action)
+        Notification.objects.create(utilisateur=destinataires, message=message, lien_action=lien_action, expediteur=expediteur, sinistre_id=sinistre_id)
 
 
 # ═════════════════════════════════════════════
@@ -152,8 +152,13 @@ class ConstantsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        from .models import Franchise
+        franchises_dict = {}
+        for f in Franchise.objects.all():
+            franchises_dict[f.nature] = f.montant
+
         return Response({
-            'natures': [{'code': code, 'label': label} for code, label in NATURE_CHOICES],
+            'natures': [{'code': code, 'label': label, 'franchise': franchises_dict.get(code, 0.0)} for code, label in NATURE_CHOICES],
             'types_par_nature': {nature: [{'code': c, 'label': l} for c, l in types] for nature, types in TYPE_PAR_NATURE.items()},
             'statuts': [{'code': code, 'label': label} for code, label in STATUT_CHOICES],
             'urgences': [{'code': code, 'label': label} for code, label in URGENCE_CHOICES],
@@ -424,16 +429,16 @@ class SinistreListCreateView(APIView):
             # 1. Informer le Directeur Assurance
             from accounts.models import Assurance, Ingenieur, Legal
             directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
-            _create_notification(directeurs_assurance, f"Nouveau sinistre déclaré : {sinistre.idSinistre} ({sinistre.get_nature_display()}).", lien)
+            _create_notification(directeurs_assurance, f"Nouveau sinistre déclaré : {sinistre.idSinistre} ({sinistre.get_nature_display()}).", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
             
             # 2. Informer l'Ingénieur
             ingenieurs = Ingenieur.objects.all()
-            _create_notification(ingenieurs, f"Besoin d'expertise pour le sinistre {sinistre.idSinistre}.", lien)
+            _create_notification(ingenieurs, f"Besoin d'expertise pour le sinistre {sinistre.idSinistre}.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
             
             # 3. Informer le rôle Legal si Vol ou Vandalisme
             if sinistre.nature in ['VOL', 'ACTE_DE_SABOTAGE']:
                 legals = Legal.objects.all()
-                _create_notification(legals, f"Dossier juridique potentiel (Vol/Vandalisme) : {sinistre.idSinistre}.", lien)
+                _create_notification(legals, f"Dossier juridique potentiel (Vol/Vandalisme) : {sinistre.idSinistre}.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
             return Response(
                 SinistreDetailSerializer(sinistre).data,
@@ -555,19 +560,100 @@ class SinistreExpertiseView(APIView):
         if 'montantEstime' in request.data:
             sinistre.montantEstime = request.data['montantEstime']
 
-        sinistre.statut = 'EN_EXPERTISE'
+        # LOGIQUE DE FRANCHISE
+        from .models import Franchise
+        
+        # VOL ou SABOTAGE -> ignore la franchise
+        if sinistre.nature in ['VOL', 'ACTE_DE_SABOTAGE']:
+            sinistre.statut = 'EN_EXPERTISE'
+            sinistre.save()
+
+            _log_changement_statut(
+                sinistre, ancien_statut, 'EN_EXPERTISE', request.user,
+                'Expertise technique complétée (Exception VOL/SABOTAGE).'
+            )
+
+            from accounts.models import Assurance
+            directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+            lien = f"/gestion/{sinistre.idSinistre}"
+            _create_notification(directeurs_assurance, f"Expertise terminée pour le sinistre {sinistre.nature} {sinistre.idSinistre}.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+            
+        else:
+            try:
+                franchise = Franchise.objects.get(nature=sinistre.nature)
+                franchise_amount = franchise.montant
+            except Franchise.DoesNotExist:
+                franchise_amount = 0.0
+
+            if sinistre.montantEstime < franchise_amount:
+                # Scénario A: Sous Franchise -> En attente de validation
+                sinistre.statut = 'ATTENTE_VALIDATION_FRANCHISE'
+                sinistre.save()
+
+                _log_changement_statut(
+                    sinistre, ancien_statut, 'ATTENTE_VALIDATION_FRANCHISE', request.user,
+                    f'Montant estimé ({sinistre.montantEstime} DA) inférieur à la franchise ({franchise_amount} DA). En attente de validation.'
+                )
+
+                # Notifier uniquement l'assurance
+                from accounts.models import Assurance
+                directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+                lien = f"/gestion/{sinistre.idSinistre}"
+                _create_notification(directeurs_assurance, f"Le sinistre {sinistre.idSinistre} est sous la franchise et attend votre validation pour clôture.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+            else:
+                # Scénario B: Montant >= Franchise -> Continue le workflow
+                sinistre.statut = 'EN_EXPERTISE'
+                sinistre.save()
+
+                _log_changement_statut(
+                    sinistre, ancien_statut, 'EN_EXPERTISE', request.user,
+                    f'Expertise technique complétée. Montant estimé ({sinistre.montantEstime} DA) dépasse la franchise.'
+                )
+
+                from accounts.models import Assurance
+                directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+                lien = f"/gestion/{sinistre.idSinistre}"
+                _create_notification(directeurs_assurance, f"Expertise terminée pour {sinistre.idSinistre}. Le dossier est prêt pour la validation finale.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+
+        return Response(SinistreDetailSerializer(sinistre).data)
+
+# ═════════════════════════════════════════════
+#  WORKFLOW STEP 1.5 : Assurance → Validation Clôture Sous Franchise
+# ═════════════════════════════════════════════
+
+class SinistreValidationFranchiseView(APIView):
+    """
+    POST /api/sinistres/<pk>/validation-franchise/
+    L'assurance valide manuellement un dossier dont le montant est inférieur à la franchise.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAssurance]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sinistre = get_object_or_404(Sinistre, pk=pk)
+
+        if sinistre.statut != 'ATTENTE_VALIDATION_FRANCHISE':
+            return Response(
+                {'error': f"Ce sinistre n'est pas en attente de validation de franchise. "
+                          f"Statut actuel : {sinistre.get_statut_display()}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ancien_statut = sinistre.statut
+        sinistre.statut = 'CLOTURE_SOUS_FRANCHISE'
+        sinistre.dateCloture = timezone.now()
         sinistre.save()
 
         _log_changement_statut(
-            sinistre, ancien_statut, 'EN_EXPERTISE', request.user,
-            'Expertise technique complétée. Dossier transmis pour validation.'
+            sinistre, ancien_statut, 'CLOTURE_SOUS_FRANCHISE', request.user,
+            'Validation manuelle de la clôture sous franchise par l\'Assurance.'
         )
 
-        # 4. Informer le Directeur Assurance (Validation Finale)
-        from accounts.models import Assurance
-        directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
-        lien = f"/gestion/{sinistre.idSinistre}"
-        _create_notification(directeurs_assurance, f"Expertise terminée pour {sinistre.idSinistre}. Le dossier est prêt pour la validation finale.", lien)
+        from accounts.models import Ingenieur
+        ingenieurs = Ingenieur.objects.all()
+        _create_notification(ingenieurs, f"Le dossier {sinistre.idSinistre} a été clôturé sous franchise.", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
+        if sinistre.createur and not hasattr(sinistre.createur, 'ingenieur'):
+            _create_notification(sinistre.createur, f"Le dossier {sinistre.idSinistre} a été clôturé sous franchise.", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
         return Response(SinistreDetailSerializer(sinistre).data)
 
@@ -619,7 +705,9 @@ class SinistreRetourCompletionView(APIView):
         _create_notification(
             ingenieurs,
             f"Dossier {sinistre.idSinistre} renvoyé pour complétion : {motif}",
-            lien
+            lien,
+            expediteur=request.user,
+            sinistre_id=sinistre.idSinistre
         )
 
         return Response(SinistreDetailSerializer(sinistre).data)
@@ -675,6 +763,17 @@ class SinistreValidationAssuranceView(APIView):
 
             sinistre.save()
             _log_changement_statut(sinistre, ancien_statut, sinistre.statut, request.user, msg)
+
+            if sinistre.statut == 'EN_VALIDATION_LEGAL':
+                from accounts.models import Legal
+                legals = Legal.objects.all()
+                lien = f"/gestion/{sinistre.idSinistre}"
+                _create_notification(legals, f"Dossier {sinistre.idSinistre} validé par l'assurance. En attente du PV de Police.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+            elif sinistre.statut == 'EN_VALIDATION_HSE':
+                from accounts.models import Hse
+                hses = Hse.objects.all()
+                lien = f"/gestion/{sinistre.idSinistre}"
+                _create_notification(hses, f"Dossier {sinistre.idSinistre} validé par l'assurance. En attente du rapport d'expertise HSE.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
         elif action == 'REJETER':
             ancien_statut = sinistre.statut
@@ -846,6 +945,10 @@ class SinistreDecisionView(APIView):
                 sinistre, ancien_statut, 'VALIDE', request.user,
                 f'Dossier accepté (DSR). Prêt pour remboursement. {commentaire}'
             )
+            from accounts.models import Ingenieur
+            _create_notification(Ingenieur.objects.all(), f"Dossier {sinistre.idSinistre} accepté (DSR).", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
+            if sinistre.createur and not hasattr(sinistre.createur, 'ingenieur'):
+                _create_notification(sinistre.createur, f"Dossier {sinistre.idSinistre} accepté (DSR).", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
         elif decision == 'REFUSER':
             ancien_statut = sinistre.statut
@@ -856,6 +959,10 @@ class SinistreDecisionView(APIView):
                 sinistre, ancien_statut, 'REJETE', request.user,
                 f'Dossier refusé (DSNR). Motif : {commentaire}'
             )
+            from accounts.models import Ingenieur
+            _create_notification(Ingenieur.objects.all(), f"Dossier {sinistre.idSinistre} rejeté (DSNR).", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
+            if sinistre.createur and not hasattr(sinistre.createur, 'ingenieur'):
+                _create_notification(sinistre.createur, f"Dossier {sinistre.idSinistre} rejeté (DSNR).", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
         else:
             return Response(
@@ -899,6 +1006,11 @@ class SinistreCloturerView(APIView):
             sinistre, ancien_statut, 'CLOTURE', request.user,
             request.data.get('commentaire', 'Sinistre clôturé.')
         )
+
+        from accounts.models import Ingenieur
+        _create_notification(Ingenieur.objects.all(), f"Dossier {sinistre.idSinistre} clôturé avec succès.", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
+        if sinistre.createur and not hasattr(sinistre.createur, 'ingenieur'):
+            _create_notification(sinistre.createur, f"Dossier {sinistre.idSinistre} clôturé avec succès.", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
         return Response(SinistreDetailSerializer(sinistre).data)
 
@@ -1132,9 +1244,11 @@ class StatistiquesView(APIView):
             'enAttente':            par_statut.get('OUVERT', 0),
             'enExpertise':          par_statut.get('EN_EXPERTISE', 0),
             'transmisAssureur':     par_statut.get('TRANSMIS_ASSUREUR', 0),
+            'attenteFranchise':     par_statut.get('ATTENTE_VALIDATION_FRANCHISE', 0),
             'valides':              par_statut.get('VALIDE', 0),
             'rejetes':              par_statut.get('REJETE', 0),
             'clotures':             par_statut.get('CLOTURE', 0),
+            'cloturesSousFranchise': par_statut.get('CLOTURE_SOUS_FRANCHISE', 0),
             'archives':             par_statut.get('ARCHIVE', 0),
             'parNature':            par_nature,
             'montantTotalEstime':   montant_total,
@@ -1173,3 +1287,57 @@ class MarkNotificationReadView(APIView):
             return Response({"message": "Notification marquée comme lue"}, status=status.HTTP_200_OK)
         except Notification.DoesNotExist:
             return Response({"error": "Notification non trouvée"}, status=status.HTTP_404_NOT_FOUND)
+
+# ═════════════════════════════════════════════
+#  FRANCHISE
+# ═════════════════════════════════════════════
+
+class FranchiseListView(APIView):
+    """
+    GET /api/franchises/
+    Retourne la liste des franchises pour toutes les natures.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .models import Franchise
+        from .serializers import FranchiseSerializer
+        
+        # S'assurer que chaque nature a une franchise (création auto à 0 si n'existe pas)
+        for code, label in NATURE_CHOICES:
+            Franchise.objects.get_or_create(nature=code)
+
+        franchises = Franchise.objects.all().order_by('nature')
+        return Response(FranchiseSerializer(franchises, many=True).data)
+
+class FranchiseUpdateView(APIView):
+    """
+    PUT /api/franchises/<nature>/
+    Met à jour le montant de la franchise pour une nature spécifique.
+    Accès: Assurance / Admin
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAssurance]
+
+    @transaction.atomic
+    def put(self, request, nature):
+        from .models import Franchise
+        from .serializers import FranchiseSerializer
+        
+        # S'assurer que la nature est valide
+        valid_natures = [n[0] for n in NATURE_CHOICES]
+        if nature not in valid_natures:
+            return Response({"error": f"Nature invalide. Natures valides : {valid_natures}"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        franchise, created = Franchise.objects.get_or_create(nature=nature)
+        
+        if 'montant' in request.data:
+            try:
+                franchise.montant = float(request.data['montant'])
+            except ValueError:
+                return Response({"error": "Le montant doit être un nombre."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            franchise.modifie_par = request.user
+            franchise.save()
+            return Response(FranchiseSerializer(franchise).data)
+        
+        return Response({"error": "Le champ 'montant' est requis."}, status=status.HTTP_400_BAD_REQUEST)

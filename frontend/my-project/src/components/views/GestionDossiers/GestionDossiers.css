@@ -248,6 +248,12 @@
 .status--archive { background: #f1f5f9; color: #64748b; }
 .status--archive .dot { background: #94a3b8; }
 
+.status--sous-franchise { background: #fffaf0; color: #dd6b20; }
+.status--sous-franchise .dot { background: #ed8936; }
+
+.status--attente-franchise { background: #fffff0; color: #d69e2e; }
+.status--attente-franchise .dot { background: #ecc94b; }
+
 .dot { width: 6px; height: 6px; border-radius: 50%; }
 
 .gd-cost { font-weight: 700; color: #1a202c; }

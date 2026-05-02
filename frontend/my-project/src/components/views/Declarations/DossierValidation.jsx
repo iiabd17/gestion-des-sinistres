@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useContext } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import jsPDF from 'jspdf'
 import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
+import { AuthContext } from '../../../context/AuthContext'
 import './DossierValidation.css'
 import './DossierCompleterDetail.css'
 
@@ -21,6 +22,7 @@ const NATURE_STYLES = {
 export default function DossierValidation() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user, unreadNotifsCount } = useContext(AuthContext)
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -186,8 +188,13 @@ export default function DossierValidation() {
       <div className="dv-main">
         <header className="dv-topbar">
           <div className="dv-topbar-actions">
-            <button className="dv-icon-btn" aria-label="Notifications"><IconBell /><span className="dv-notif-dot" /></button>
-            <button className="dv-icon-btn" aria-label="Profil"><IconUser /></button>
+            <button className="dv-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
+              <IconBell />
+              {unreadNotifsCount > 0 && <span className="dv-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
+            </button>
+            <button className="dv-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
+              <IconUser />
+            </button>
           </div>
         </header>
 

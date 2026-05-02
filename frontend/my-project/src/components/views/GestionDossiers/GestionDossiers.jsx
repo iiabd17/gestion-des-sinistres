@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../../../context/AuthContext'
 import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
+
 import './GestionDossiers.css'
 
 export default function GestionDossiers() {
   const navigate = useNavigate()
-  const { user } = useContext(AuthContext)
+  const { user, unreadNotifsCount } = useContext(AuthContext)
 
   const [dossiers, setDossiers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -68,8 +69,11 @@ export default function GestionDossiers() {
         {/* Topbar */}
         <header className="gd-topbar">
           <div className="gd-topbar-actions">
-            <button className="gd-icon-btn"><IconBell /><span className="gd-notif-dot" /></button>
-            <button className="gd-icon-btn"><IconUser /></button>
+            <button className="gd-icon-btn" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
+              <IconBell />
+              {unreadNotifsCount > 0 && <span className="gd-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
+            </button>
+            <button className="gd-icon-btn" onClick={() => navigate('/profile')}><IconUser /></button>
           </div>
         </header>
 
@@ -221,6 +225,8 @@ function getStatusClass(statut) {
   if (statut === 'TRANSMIS_ASSUREUR' || statut === 'EN_VALIDATION_LEGAL' || statut === 'EN_VALIDATION_HSE') return 'status--transmis';
   if (statut === 'CLOTURE' || statut === 'VALIDE') return 'status--cloture';
   if (statut === 'ARCHIVE' || statut === 'REJETE') return 'status--archive';
+  if (statut === 'ATTENTE_VALIDATION_FRANCHISE') return 'status--attente-franchise';
+  if (statut === 'CLOTURE_SOUS_FRANCHISE') return 'status--sous-franchise';
   return '';
 }
 

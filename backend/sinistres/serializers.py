@@ -15,7 +15,8 @@ Sérialiseurs DRF pour le système de gestion des sinistres.
 from rest_framework import serializers
 from .models import (
     Site, Sinistre, Equipement, PieceJointe, HistoriqueStatut,
-    NATURE_CHOICES, TYPE_PAR_NATURE, ALL_TYPE_CHOICES, Notification
+    NATURE_CHOICES, TYPE_PAR_NATURE, ALL_TYPE_CHOICES, Notification,
+    Franchise
 )
 
 
@@ -146,6 +147,7 @@ class SinistreDetailSerializer(serializers.ModelSerializer):
     site_detail        = SiteSerializer(source='site', read_only=True)
     createur_nom       = serializers.SerializerMethodField(read_only=True)
     createur_detail    = serializers.SerializerMethodField(read_only=True)
+    franchise_info     = serializers.SerializerMethodField(read_only=True)
 
     # Nested relations (lecture seule dans ce sérialiseur)
     piecesJointes     = PieceJointeSerializer(many=True, read_only=True)
@@ -169,6 +171,7 @@ class SinistreDetailSerializer(serializers.ModelSerializer):
             'montantIndemnisation', 'motifRejet',
             # Relations imbriquées
             'piecesJointes', 'equipements', 'historiqueStatuts',
+            'franchise_info',
         ]
 
     def get_createur_nom(self, obj):
@@ -195,6 +198,15 @@ class SinistreDetailSerializer(serializers.ModelSerializer):
             detail['fonction'] = user.equipeterrain.fonction or ''
             detail['matricule'] = user.equipeterrain.matricule or ''
         return detail
+
+    def get_franchise_info(self, obj):
+        if obj.nature in ['VOL', 'ACTE_DE_SABOTAGE']:
+            return "Non applicable"
+        try:
+            franchise = Franchise.objects.get(nature=obj.nature)
+            return franchise.montant
+        except Franchise.DoesNotExist:
+            return 0.0
 
 
 # ═════════════════════════════════════════════
@@ -256,7 +268,32 @@ class SinistreCreateSerializer(serializers.ModelSerializer):
 # ═════════════════════════════════════════════
 
 class NotificationSerializer(serializers.ModelSerializer):
+    expediteur_nom = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Notification
-        fields = ['id', 'utilisateur', 'message', 'is_read', 'lien_action', 'dateCreation']
-        read_only_fields = ['id', 'utilisateur', 'dateCreation']
+        fields = ['id', 'utilisateur', 'message', 'is_read', 'lien_action', 'dateCreation', 'expediteur', 'expediteur_nom', 'sinistre_id']
+        read_only_fields = ['id', 'utilisateur', 'dateCreation', 'expediteur', 'sinistre_id']
+
+    def get_expediteur_nom(self, obj):
+        if obj.expediteur:
+            return f"{obj.expediteur.nom} {obj.expediteur.prenom}"
+        return None
+
+# ═════════════════════════════════════════════
+#  FRANCHISE
+# ═════════════════════════════════════════════
+
+class FranchiseSerializer(serializers.ModelSerializer):
+    nature_label = serializers.CharField(source='get_nature_display', read_only=True)
+    modifie_par_nom = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Franchise
+        fields = ['id', 'nature', 'nature_label', 'montant', 'date_modification', 'modifie_par', 'modifie_par_nom']
+        read_only_fields = ['id', 'date_modification', 'modifie_par']
+
+    def get_modifie_par_nom(self, obj):
+        if obj.modifie_par:
+            return f"{obj.modifie_par.nom} {obj.modifie_par.prenom}"
+        return None

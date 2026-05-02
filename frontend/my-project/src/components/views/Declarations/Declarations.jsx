@@ -13,6 +13,7 @@ const statutBadge = {
   'TRANSMIS_ASSUREUR':     { bg: '#d1fae5', color: '#065f46', label: 'TRANSMIS' },
   'EN_VALIDATION_LEGAL':   { bg: '#ede9fe', color: '#7c3aed', label: 'VALIDATION LÉGAL' },
   'EN_VALIDATION_HSE':     { bg: '#fce7f3', color: '#be185d', label: 'VALIDATION HSE' },
+  'ATTENTE_VALIDATION_FRANCHISE': { bg: '#fffff0', color: '#d69e2e', label: 'ATTENTE CLÔTURE' },
   'VALIDE':                { bg: '#d1fae5', color: '#065f46', label: 'VALIDÉ' },
   'REJETE':                { bg: '#fee2e2', color: '#b91c1c', label: 'REJETÉ' },
   'CLOTURE':               { bg: '#e2e8f0', color: '#475569', label: 'CLÔTURÉ' },
@@ -22,7 +23,7 @@ const statutBadge = {
 export default function Declarations() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useContext(AuthContext)
+  const { user, unreadNotifsCount } = useContext(AuthContext)
   const role = user?.role || ''
 
   const [tab, setTab] = useState(location.state?.tab || 'completer')
@@ -66,12 +67,14 @@ export default function Declarations() {
   // Charger les dossiers à valider
   useEffect(() => {
     setLoadingValider(true)
-    api.get('/sinistres/?statut=EN_EXPERTISE&page_size=50')
-      .then(res => {
-        setDossiersValider(res.data?.results || res.data || [])
-      })
-      .catch(() => {})
-      .finally(() => setLoadingValider(false))
+    Promise.all([
+      api.get('/sinistres/?statut=EN_EXPERTISE&page_size=50').catch(() => ({ data: { results: [] } })),
+      api.get('/sinistres/?statut=ATTENTE_VALIDATION_FRANCHISE&page_size=50').catch(() => ({ data: { results: [] } })),
+    ]).then(([expRes, attRes]) => {
+      const exp = expRes.data?.results || expRes.data || []
+      const att = attRes.data?.results || attRes.data || []
+      setDossiersValider([...exp, ...att])
+    }).finally(() => setLoadingValider(false))
   }, [])
 
   // Filtrage côté frontend
@@ -89,11 +92,11 @@ export default function Declarations() {
         {/* Top bar */}
         <header className="dcl-topbar">
           <div className="dcl-topbar-actions">
-            <button className="dcl-icon-btn" aria-label="Notifications">
+            <button className="dcl-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
               <IconBell />
-              <span className="dcl-notif-dot" />
+              {unreadNotifsCount > 0 && <span className="dcl-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
             </button>
-            <button className="dcl-icon-btn" aria-label="Profil">
+            <button className="dcl-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
               <IconUser />
             </button>
           </div>

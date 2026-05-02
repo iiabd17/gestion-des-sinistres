@@ -104,4 +104,15 @@ urlpatterns = [
     path('statistiques/',
          views.StatistiquesView.as_view(),
          name='statistiques'),
+
+    # Validation Franchise (Assurance)
+    path('<str:pk>/validation-franchise/', views.SinistreValidationFranchiseView.as_view(), name='sinistre-validation-franchise'),
+
+    # ── Franchises ──
+    path('franchises/',
+         views.FranchiseListView.as_view(),
+         name='franchise-list'),
+    path('franchises/<str:nature>/',
+         views.FranchiseUpdateView.as_view(),
+         name='franchise-update'),
 ]

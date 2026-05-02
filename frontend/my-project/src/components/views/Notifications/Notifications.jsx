@@ -97,8 +97,18 @@ export default function Notifications() {
                       {notif.is_read ? <IconMailOpen /> : <IconMail />}
                     </div>
                     <div className="nt-item-content">
+                      {notif.sinistre_id && (
+                        <div className="nt-item-sinistre-id">
+                          Dossier: <strong>{notif.sinistre_id}</strong>
+                        </div>
+                      )}
                       <p className="nt-item-msg">{notif.message}</p>
-                      <span className="nt-item-date">{new Date(notif.dateCreation).toLocaleString()}</span>
+                      <div className="nt-item-footer">
+                        <span className="nt-item-date">{new Date(notif.dateCreation).toLocaleString('fr-FR')}</span>
+                        {notif.expediteur_nom && (
+                          <span className="nt-item-sender"> • De : {notif.expediteur_nom}</span>
+                        )}
+                      </div>
                     </div>
                     {notif.lien_action && (
                       <div className="nt-item-arrow">

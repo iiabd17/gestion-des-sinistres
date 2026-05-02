@@ -102,6 +102,8 @@ STATUT_CHOICES = [
     ('VALIDE',                  'Validé'),
     ('REJETE',                  'Rejeté'),
     ('CLOTURE',                 'Clôturé'),
+    ('ATTENTE_VALIDATION_FRANCHISE', 'En Attente de Clôture (Sous Franchise)'),
+    ('CLOTURE_SOUS_FRANCHISE',  'Clôturé — Sous Franchise'),
     ('ARCHIVE',                 'Archivé'),
 ]
 
@@ -376,6 +378,14 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     lien_action = models.CharField(max_length=255, blank=True, null=True, help_text="Lien vers l'action ou le dossier")
+    expediteur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='notifications_envoyees',
+        verbose_name='Expéditeur'
+    )
+    sinistre_id = models.CharField(max_length=50, blank=True, null=True, help_text="Référence du sinistre lié")
     dateCreation = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -386,3 +396,30 @@ class Notification(models.Model):
         verbose_name = 'Notification'
         verbose_name_plural = 'Notifications'
         ordering = ['-dateCreation']
+
+
+# ═════════════════════════════════════════════
+#  FRANCHISE
+# ═════════════════════════════════════════════
+
+class Franchise(models.Model):
+    """
+    Montant de la franchise (déductible) appliqué par nature de sinistre.
+    """
+    nature = models.CharField(max_length=30, choices=NATURE_CHOICES, unique=True)
+    montant = models.FloatField(default=0.0, verbose_name="Montant de la franchise (DA)")
+    date_modification = models.DateTimeField(auto_now=True)
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='franchises_modifiees'
+    )
+
+    def __str__(self):
+        return f"Franchise {self.get_nature_display()} : {self.montant} DA"
+
+    class Meta:
+        db_table = 'franchise'
+        verbose_name = 'Franchise'
+        verbose_name_plural = 'Franchises'

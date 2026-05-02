@@ -49,16 +49,17 @@ class EquipeTerrain(Utilisateur):
     matricule = models.CharField(max_length=50, null=True, blank=True)
 
 class Ingenieur(Utilisateur):
-    # Only inherits from Utilisateur now
     utilisateur = models.OneToOneField(Utilisateur, on_delete=models.CASCADE, parent_link=True, primary_key=True)
+    specialite = models.CharField(max_length=100, null=True, blank=True)
+    matriculeTechnique = models.CharField(max_length=50, null=True, blank=True)
 
 class Legal(Utilisateur):
-    # Only inherits from Utilisateur now
     utilisateur = models.OneToOneField(Utilisateur, on_delete=models.CASCADE, parent_link=True, primary_key=True)
+    division = models.CharField(max_length=100, null=True, blank=True)
 
 class Hse(Utilisateur):
-    # Only inherits from Utilisateur now
     utilisateur = models.OneToOneField(Utilisateur, on_delete=models.CASCADE, parent_link=True, primary_key=True)
+    zoneIntervention = models.CharField(max_length=100, null=True, blank=True)
 
 class Assurance(Utilisateur):
     class RoleAssurance(models.TextChoices):

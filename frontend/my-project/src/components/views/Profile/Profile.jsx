@@ -92,6 +92,15 @@ export default function Profile() {
                 <span className="pr-role-badge">{profileData.role || 'UTILISATEUR'}</span>
                 <div className="pr-info-text">
                   <p><strong>Nom d'utilisateur:</strong> {profileData.username}</p>
+                  <p><strong>Statut:</strong> {profileData.estActif ? 'Actif' : 'Inactif'}</p>
+                  {profileData.matricule && <p><strong>Matricule:</strong> {profileData.matricule}</p>}
+                  {profileData.departement && <p><strong>Département:</strong> {profileData.departement}</p>}
+                  {profileData.fonction && <p><strong>Fonction:</strong> {profileData.fonction}</p>}
+                  {profileData.specialite && <p><strong>Spécialité:</strong> {profileData.specialite}</p>}
+                  {profileData.matriculeTechnique && <p><strong>Matricule Technique:</strong> {profileData.matriculeTechnique}</p>}
+                  {profileData.division && <p><strong>Division:</strong> {profileData.division}</p>}
+                  {profileData.zoneIntervention && <p><strong>Zone d'Intervention:</strong> {profileData.zoneIntervention}</p>}
+                  {profileData.role_assurance && <p><strong>Niveau:</strong> {profileData.role_assurance}</p>}
                 </div>
               </div>
 

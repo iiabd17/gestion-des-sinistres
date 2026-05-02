@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useContext } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import api from '../../../api'
 import { toast } from 'react-toastify'
+import { AuthContext } from '../../../context/AuthContext'
 import jsPDF from 'jspdf'
 import '../Declarations/DossierValidation.css'
 import '../Declarations/DossierCompleterDetail.css'
@@ -23,6 +24,8 @@ export default function DossierGestionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
+  const { user, unreadNotifsCount } = useContext(AuthContext)
+  const isAdminOrAssurance = ['ADMIN', 'ASSURANCE'].includes(user?.role)
 
   const [data, setData] = useState(null)
   const [statuts, setStatuts] = useState([])
@@ -72,6 +75,16 @@ export default function DossierGestionDetail() {
       setData(prev => ({ ...prev, numeroPV }))
       toast.success('Numéro du PV sauvegardé')
     } catch { toast.error('Erreur lors de la sauvegarde du PV') }
+  }
+
+  const handleValidateFranchise = async () => {
+    try {
+      const res = await api.post(`/sinistres/${id}/validation-franchise/`)
+      setData(res.data)
+      toast.success('Clôture validée avec succès')
+    } catch (error) {
+      toast.error('Erreur lors de la validation de la clôture')
+    }
   }
 
   const exportPDF = async () => {
@@ -138,20 +151,23 @@ export default function DossierGestionDetail() {
   const cout = equipements.length > 0
     ? equipements.reduce((s, e) => s + (parseFloat(e.valeurComptable) || 0) * (e.quantiteImpactee || 1), 0)
     : parseFloat(data.montantEstime || 0)
-
   return (
     <div className="dv-layout">
       <Sidebar />
       <div className="dv-main">
-        <header className="dv-topbar">
-          <div className="dv-topbar-actions">
-            <button className="dv-icon-btn" aria-label="Notifications"><IconBell /><span className="dv-notif-dot" /></button>
-            <button className="dv-icon-btn" aria-label="Profil"><IconUser /></button>
+        <header className="dgd-topbar">
+          <div className="dgd-topbar-actions">
+            <button className="dv-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
+              <IconBell />
+              {unreadNotifsCount > 0 && <span className="dv-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
+            </button>
+            <button className="dv-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
+              <IconUser />
+            </button>
           </div>
         </header>
 
         <main className="dv-content">
-          {/* Page header */}
           <div className="dv-page-header">
             <div className="dv-page-meta">
               <span className="dv-eyebrow"><IconDocument />{data.statut_label?.toUpperCase() || data.statut}</span>
@@ -172,6 +188,11 @@ export default function DossierGestionDetail() {
               </div>
               {/* Action buttons */}
               <div className="dgd-actions-row">
+                {data.statut === 'ATTENTE_VALIDATION_FRANCHISE' && isAdminOrAssurance && (
+                  <button className="dgd-btn-secondary" style={{ background: '#E2000F', color: 'white', borderColor: '#E2000F' }} onClick={handleValidateFranchise}>
+                    Valider Clôture
+                  </button>
+                )}
                 <button className="dgd-btn-secondary" onClick={() => setIsEditing(!isEditing)}>
                   <IconEdit /> {isEditing ? 'Terminer' : 'Modifier'}
                 </button>
@@ -365,11 +386,19 @@ export default function DossierGestionDetail() {
                   <span className="dcd-fin-currency">DA</span>
                   <span className="dcd-fin-amount">{cout.toLocaleString('fr-FR')}</span>
                 </div>
-                <p className="dcd-fin-note">
+                <p className="dcd-fin-note" style={{ marginBottom: '12px' }}>
                   {equipements.length > 0
                     ? `Basé sur ${equipements.length} équipement(s)`
                     : 'Montant estimé initial'}
                 </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Franchise applicable</span>
+                  <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: '600' }}>
+                    {typeof data.franchise_info === 'number' && data.franchise_info > 0 
+                      ? `${data.franchise_info.toLocaleString('fr-FR')} DA` 
+                      : data.franchise_info === 0 ? 'Aucune (0 DA)' : data.franchise_info}
+                  </span>
+                </div>
               </section>
 
               {/* Pièces Jointes */}
