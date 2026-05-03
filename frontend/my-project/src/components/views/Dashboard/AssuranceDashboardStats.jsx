@@ -135,8 +135,6 @@ export default function AssuranceDashboardStats() {
                     tickLine={false} 
                     tick={{fill: '#64748B', fontSize: 11}} 
                     dy={10} 
-                    angle={-15}
-                    textAnchor="end"
                 />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748B', fontSize: 12}} dx={-10} />
                 <RechartsTooltip

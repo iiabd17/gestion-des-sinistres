@@ -1378,16 +1378,24 @@ class StatistiquesAssuranceView(APIView):
             
         temps_moyen_par_etape = []
         statut_dict = dict(STATUT_CHOICES)
-        for statut, durs in durations.items():
+        for statut, label in statut_dict.items():
+            durs = durations.get(statut, [])
             if len(durs) > 0:
                 avg_secs = sum(durs) / len(durs)
-                label = statut_dict.get(statut, statut)
                 temps_moyen_par_etape.append({
                     'etape': statut,
                     'label': label,
                     'duree_moyenne_heures': round(avg_secs / 3600, 2),
                     'duree_moyenne_jours': round(avg_secs / 86400, 2),
                     'echantillon': len(durs)
+                })
+            else:
+                temps_moyen_par_etape.append({
+                    'etape': statut,
+                    'label': label,
+                    'duree_moyenne_heures': 0,
+                    'duree_moyenne_jours': 0,
+                    'echantillon': 0
                 })
                 
         return Response({

@@ -106,20 +106,7 @@ export default function Dashboard() {
           {/* Section spécifique Assurance */}
           {user?.role === 'ASSURANCE' && <AssuranceDashboardStats />}
 
-          {/* stat cards */}
-          <div className="db-stats">
-            {/* card 1 */}
-            <div className="db-stat-card">
-              <span className="db-stat-label">TOTAL DES SINISTRES</span>
-              <span className="db-stat-value">{totalCount}</span>
-            </div>
 
-            {/* card 2 */}
-            <div className="db-stat-card">
-              <span className="db-stat-label">EN ATTENTE DE TRAITEMENT</span>
-              <span className="db-stat-value db-stat-value--sm">{enAttenteCount}</span>
-            </div>
-          </div>
 
           {/* bottom split: table + info */}
           <div className="db-bottom">
