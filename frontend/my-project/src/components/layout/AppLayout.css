@@ -1,0 +1,196 @@
+/* ── AppLayout — Shared shell ─────────────────────────── */
+
+.al-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #f5f6fa;
+}
+
+.al-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid #edf2f7;
+  border-top-color: #E2000F;
+  animation: al-spin 0.8s linear infinite;
+}
+
+@keyframes al-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Layout grid ─────────────────────────────────────── */
+.al-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: #f5f6fa;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Sidebar wrapper */
+.al-sidebar-wrap {
+  flex-shrink: 0;
+}
+
+/* Main area */
+.al-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Global header ───────────────────────────────────── */
+.al-header {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 28px;
+  background: #fff;
+  border-bottom: 1px solid #edf2f7;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+.al-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.al-header-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid #edf2f7;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #718096;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.al-header-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.al-header-btn:hover {
+  background: #f7fafc;
+  color: #E2000F;
+  border-color: #ffdada;
+}
+
+.al-notif-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: #E2000F;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+.al-user-name {
+  font-size: 0.85rem;
+  color: #4a5568;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Page content wrapper */
+.al-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* ── Hamburger (hidden on desktop) ───────────────────── */
+.al-hamburger {
+  display: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid #edf2f7;
+  background: #fff;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #4a5568;
+  margin-right: auto;
+  transition: all 0.2s;
+}
+
+.al-hamburger svg {
+  width: 20px;
+  height: 20px;
+}
+
+.al-hamburger:hover {
+  background: #f7fafc;
+  color: #E2000F;
+}
+
+/* ── Overlay (mobile) ────────────────────────────────── */
+.al-overlay {
+  display: none;
+}
+
+/* ── Mobile responsive ───────────────────────────────── */
+@media (max-width: 768px) {
+  .al-hamburger {
+    display: flex;
+  }
+
+  .al-sidebar-wrap {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px;
+    height: 100vh;
+    z-index: 200;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+  }
+
+  .al-sidebar-wrap--open {
+    left: 0;
+    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Force sidebar to fill the wrapper on mobile */
+  .al-sidebar-wrap .sb-sidebar {
+    width: 100% !important;
+    min-width: unset !important;
+    height: 100vh;
+  }
+
+  .al-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 199;
+    backdrop-filter: blur(2px);
+  }
+
+  .al-header {
+    padding: 0 16px;
+  }
+
+  .al-user-name {
+    display: none;
+  }
+}

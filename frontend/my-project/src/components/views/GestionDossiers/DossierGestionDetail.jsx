@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useContext } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import api from '../../../api'
 import { toast } from 'react-toastify'
 import { AuthContext } from '../../../context/AuthContext'
@@ -126,12 +125,12 @@ export default function DossierGestionDetail() {
   }
 
   if (loading) return (
-    <div className="dv-layout"><Sidebar />
+    <div className="dv-page-content">
       <div className="dv-main dcd-center"><div className="dcd-spinner" /><p className="dcd-loading-text">Chargement...</p></div>
     </div>
   )
   if (!data) return (
-    <div className="dv-layout"><Sidebar />
+    <div className="dv-page-content">
       <div className="dv-main dcd-center"><p className="dcd-error-text">Dossier introuvable</p></div>
     </div>
   )
@@ -152,20 +151,8 @@ export default function DossierGestionDetail() {
     ? equipements.reduce((s, e) => s + (parseFloat(e.valeurComptable) || 0) * (e.quantiteImpactee || 1), 0)
     : parseFloat(data.montantEstime || 0)
   return (
-    <div className="dv-layout">
-      <Sidebar />
+    <div className="dv-page-content">
       <div className="dv-main">
-        <header className="dgd-topbar">
-          <div className="dgd-topbar-actions">
-            <button className="dv-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
-              <IconBell />
-              {unreadNotifsCount > 0 && <span className="dv-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
-            </button>
-            <button className="dv-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
-              <IconUser />
-            </button>
-          </div>
-        </header>
 
         <main className="dv-content">
           <div className="dv-page-header">

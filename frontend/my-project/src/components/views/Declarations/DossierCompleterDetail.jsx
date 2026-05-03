@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useContext } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import api from '../../../api'
-import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import { AuthContext } from '../../../context/AuthContext'
 import './DossierValidation.css'
 import './DossierCompleterDetail.css'
@@ -107,8 +106,7 @@ export default function DossierCompleterDetail() {
   // ── Loading / Error states ──
   if (loading) {
     return (
-      <div className="dv-layout">
-        <Sidebar />
+      <div className="dv-page-content">
         <div className="dv-main dcd-center">
           <div className="dcd-spinner" />
           <p className="dcd-loading-text">Chargement du dossier...</p>
@@ -119,8 +117,7 @@ export default function DossierCompleterDetail() {
 
   if (!data) {
     return (
-      <div className="dv-layout">
-        <Sidebar />
+      <div className="dv-page-content">
         <div className="dv-main dcd-center">
           <p className="dcd-error-text">Dossier introuvable</p>
         </div>
@@ -141,22 +138,8 @@ export default function DossierCompleterDetail() {
   const statutLabel = data.statut === 'OUVERT' ? 'DOSSIER EN ATTENTE' : data.statut_label?.toUpperCase() || data.statut
 
   return (
-    <div className="dv-layout">
-      <Sidebar />
-
+    <div className="dv-page-content">
       <div className="dv-main">
-        {/* Topbar */}
-        <header className="dv-topbar">
-          <div className="dv-topbar-actions">
-            <button className="dv-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
-              <IconBell />
-              {unreadNotifsCount > 0 && <span className="dv-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
-            </button>
-            <button className="dv-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
-              <IconUser />
-            </button>
-          </div>
-        </header>
 
         <main className="dv-content">
           <ClaimTimeline currentStatus={data.statut} />

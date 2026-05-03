@@ -158,23 +158,7 @@ export default function Declarations() {
   }
 
   return (
-    <div className="dcl-layout">
-      <Sidebar />
-
-      <div className="dcl-main">
-        {/* Top bar */}
-        <header className="dcl-topbar">
-          <div className="dcl-topbar-actions">
-            <button className="dcl-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
-              <IconBell />
-              {unreadNotifsCount > 0 && <span className="dcl-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
-            </button>
-            <button className="dcl-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
-              <IconUser />
-            </button>
-          </div>
-        </header>
-
+    <div className="dcl-page-content">
         <main className="dcl-content">
           {/* ── Primary tabs ────────────────────────── */}
           <div className="dcl-primary-tabs">
@@ -519,7 +503,6 @@ export default function Declarations() {
             </div>
           </div>
         )}
-      </div>
     </div>
   )
 }

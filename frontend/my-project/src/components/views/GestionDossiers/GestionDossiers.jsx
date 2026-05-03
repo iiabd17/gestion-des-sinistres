@@ -2,7 +2,6 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../../../context/AuthContext'
 import api from '../../../api'
-import Sidebar from '../../../componenets/Sidebar/Sidebar'
 
 import './GestionDossiers.css'
 
@@ -63,21 +62,7 @@ export default function GestionDossiers() {
   const totalPages = Math.ceil(totalCount / 10)
 
   return (
-    <div className="gd-layout">
-      <Sidebar />
-
-      <div className="gd-main">
-        {/* Topbar */}
-        <header className="gd-topbar">
-          <div className="gd-topbar-actions">
-            <button className="gd-icon-btn" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
-              <IconBell />
-              {unreadNotifsCount > 0 && <span className="gd-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
-            </button>
-            <button className="gd-icon-btn" onClick={() => navigate('/profile')}><IconUser /></button>
-          </div>
-        </header>
-
+    <div className="gd-page-content">
         <main className="gd-content">
           {/* Header */}
           <div className="gd-header">
@@ -224,14 +209,6 @@ export default function GestionDossiers() {
             )}
           </div>
         </main>
-
-        {/* FAB */}
-        {['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN'].includes(user?.role) && (
-          <button className="gd-fab" onClick={() => navigate('/declarations/new')}>
-            <IconPlusLarge />
-          </button>
-        )}
-      </div>
     </div>
   );
 }

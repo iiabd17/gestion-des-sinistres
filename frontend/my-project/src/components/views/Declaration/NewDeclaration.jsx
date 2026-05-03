@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import AsyncSelect from 'react-select/async'
 import api from '../../../api'
-import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import { AuthContext } from '../../../context/AuthContext'
 import './NewDeclaration.css'
 
@@ -222,22 +221,7 @@ export default function NewDeclaration() {
   }
 
   return (
-    <div className="nd-layout">
-      <Sidebar />
-
-      <div className="nd-main">
-        {/* Top bar */}
-        <header className="nd-topbar">
-          <div className="nd-topbar-actions">
-            <button className="nd-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
-              <IconBell />
-              {unreadNotifsCount > 0 && <span className="nd-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
-            </button>
-            <button className="nd-icon-btn" aria-label="Profil" onClick={() => navigate('/profile')}>
-              <IconUser />
-            </button>
-          </div>
-        </header>
+    <div className="nd-page-content">
 
         {/* Page content */}
         <main className="nd-content">
@@ -603,7 +587,6 @@ export default function NewDeclaration() {
             </div>
           </form>
         </main>
-      </div>
     </div>
   )
 }

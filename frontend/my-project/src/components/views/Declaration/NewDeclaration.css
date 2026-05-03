@@ -554,8 +554,55 @@
 
 .nd-cancel-btn:hover { color: #333; }
 
-/* ── Responsive ─────────────────────────────────────── */
+/* ── Responsive (Mobile-First Optimization) ─────────────────────────────────────── */
 @media (max-width: 900px) {
-  .nd-cols { grid-template-columns: 1fr; }
-  .nd-content { padding: 20px 16px 60px; }
+  .nd-cols { grid-template-columns: 1fr; gap: 16px; }
+  .nd-content { padding: 16px 12px 60px; }
+  
+  /* Make 2-column rows stack on mobile */
+  .nd-row-2 {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  /* Increase touch targets for inputs */
+  .nd-input,
+  .nd-select,
+  .nd-textarea {
+    min-height: 48px;
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  /* Specific fix for textarea height */
+  .nd-textarea {
+    height: auto;
+    min-height: 100px;
+  }
+
+  /* Make file upload target larger */
+  .nd-dropzone {
+    padding: 32px 16px;
+  }
+  
+  .nd-drop-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Bigger action buttons */
+  .nd-submit-btn {
+    height: 52px;
+    font-size: 15px;
+  }
+
+  .nd-cancel-btn {
+    height: 44px; /* Give it enough touch area */
+  }
+
+  /* Give section cards a bit less padding to maximize screen space */
+  .nd-section-card {
+    padding: 16px;
+    border-radius: 10px;
+  }
 }

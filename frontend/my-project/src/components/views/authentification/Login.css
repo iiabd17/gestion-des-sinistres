@@ -301,31 +301,71 @@
   transform: translateX(4px);
 }
 
-/* ─── Responsive ──────────────────────────────────────── */
+/* ─── Responsive (Mobile-First Optimization) ──────────────────────────────────────── */
 @media (max-width: 780px) {
   .lp-wrapper {
     flex-direction: column;
     align-items: stretch;
     background: #fff;
+    min-height: 100vh;
   }
 
-  .lp-left {
+  /* Keep a reasonable height for the hero image on mobile */
+  .lp-wrapper > .lp-left {
     width: 100%;
     min-width: unset;
-    height: 220px;
-    border-radius: 0 0 0 0;
+    height: 260px;
+    border-radius: 0 0 24px 24px;
+    padding: 24px;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   }
 
-  .lp-right {
+  .lp-hero-title {
+    font-size: 24px;
+  }
+  
+  .lp-hero-desc {
+    display: none; /* Hide description to save space on mobile */
+  }
+
+  .lp-wrapper > .lp-right {
     width: 100%;
     min-width: unset;
     height: auto;
     border-radius: 0;
-    padding: 32px 0 48px;
+    padding: 32px 20px 48px;
+    box-shadow: none;
+    flex: 1;
+    align-items: flex-start; /* Push form to the top instead of centering */
   }
 
-  .lp-wrapper > .lp-left,
-  .lp-wrapper > .lp-right {
-    height: auto;
+  .lp-card {
+    padding: 0; /* Remove horizontal padding, rely on lp-right padding */
+  }
+
+  /* Increase touch targets for mobile */
+  .lp-input {
+    height: 50px;
+    font-size: 14px;
+  }
+
+  .lp-btn {
+    height: 52px;
+    font-size: 15px;
+  }
+
+  .lp-label {
+    font-size: 13.5px;
+  }
+
+  .lp-remember {
+    font-size: 13.5px;
+    margin-top: 4px;
+  }
+
+  .lp-remember input[type='checkbox'] {
+    width: 18px;
+    height: 18px;
   }
 }

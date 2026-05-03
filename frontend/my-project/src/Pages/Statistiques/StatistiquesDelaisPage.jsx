@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import api from '../../api';
-import Sidebar from '../../componenets/Sidebar/Sidebar';
 import './StatistiquesDelais.css';
 
 const STATUT_OPTIONS = [
@@ -106,17 +105,7 @@ export default function StatistiquesDelaisPage() {
     .sort((a, b) => sortOrder === 'desc' ? b.duree_heures - a.duree_heures : a.duree_heures - b.duree_heures);
 
   return (
-    <div className="sd-layout">
-      <Sidebar />
-      <div className="sd-main">
-        {/* Top bar */}
-        <header className="sd-topbar">
-          <div className="sd-topbar-actions">
-            <button className="sd-icon-btn"><IconBell /></button>
-            <button className="sd-icon-btn"><IconUser /></button>
-          </div>
-        </header>
-
+    <div className="sd-page-content">
         <main className="sd-content">
           {/* Breadcrumbs */}
           <nav className="sd-breadcrumbs">
@@ -336,7 +325,6 @@ export default function StatistiquesDelaisPage() {
             </div>
           )}
         </main>
-      </div>
     </div>
   );
 }

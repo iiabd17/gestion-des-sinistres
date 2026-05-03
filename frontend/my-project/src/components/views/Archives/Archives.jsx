@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../../api'
-import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './Archives.css'
 
 export default function Archives() {
@@ -38,18 +37,7 @@ export default function Archives() {
   const totalMontant = archives.reduce((sum, d) => sum + (parseFloat(d.montantEstime) || 0), 0)
 
   return (
-    <div className="arc-layout">
-      <Sidebar />
-
-      <div className="arc-main">
-        {/* Top bar */}
-        <header className="arc-topbar">
-          <div className="arc-topbar-actions">
-            <button className="arc-icon-btn"><IconBell /></button>
-            <button className="arc-icon-btn"><IconUser /></button>
-          </div>
-        </header>
-
+    <div className="arc-page-content">
         <main className="arc-content">
           {/* Breadcrumbs */}
           <nav className="arc-breadcrumbs">Archives</nav>
@@ -57,14 +45,14 @@ export default function Archives() {
           {/* Header */}
           <header className="arc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h1>Archives des Dossiers</h1>
-            <div className="arc-search" style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '280px' }}>
-              <IconSearch style={{ marginRight: '8px', color: '#a0aec0' }} />
+            <div className="arc-search" style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '10px 16px', borderRadius: '10px', border: '1px solid #e2e8f0', width: '300px' }}>
+              <IconSearch style={{ marginRight: '10px', color: '#a0aec0', width: 18, height: 18 }} />
               <input 
                 type="text" 
                 placeholder="Rechercher par ID..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ border: 'none', outline: 'none', width: '100%', fontSize: '14px', color: '#2d3748' }}
+                style={{ border: 'none', outline: 'none', width: '100%', fontSize: '14px', color: '#2d3748', background: 'transparent' }}
               />
             </div>
           </header>
@@ -182,7 +170,6 @@ export default function Archives() {
             )}
           </div>
         </main>
-      </div>
     </div>
   );
 }

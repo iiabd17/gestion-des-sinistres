@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from '../../../componenets/Sidebar/Sidebar';
 import { toast } from 'react-toastify';
 import api from '../../../api';
 import './Notifications.css';
@@ -48,22 +47,7 @@ export default function Notifications() {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="nt-layout">
-      <Sidebar />
-      <div className="nt-main">
-        {/* TOPBAR */}
-        <header className="nt-topbar">
-          <div className="nt-topbar-actions">
-            <button className="nt-icon-btn nt-icon-btn--active" onClick={() => navigate('/notifications')}>
-              <IconBell />
-              {unreadCount > 0 && <span className="nt-notif-dot" />}
-            </button>
-            <button className="nt-icon-btn" onClick={() => navigate('/profile')}>
-              <IconUserC />
-            </button>
-          </div>
-        </header>
-
+    <div className="nt-page-content">
         {/* CONTENT */}
         <div className="nt-content">
           <div className="nt-header">
@@ -121,7 +105,6 @@ export default function Notifications() {
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 }

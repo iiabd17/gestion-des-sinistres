@@ -4,6 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AppLayout from './components/layout/AppLayout';
 
 import LoginPage from './Pages/authentification/LoginPage';
 import DashboardPage from './Pages/Dashboard/DashboardPage';
@@ -28,44 +29,49 @@ function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Routes Protégées - Tout rôle connecté peut accéder au dashboard, profil, notifs */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/notifications" element={<NotificationsPage />} />
-          </Route>
+          {/* ── All authenticated routes share AppLayout (Sidebar + Header) ── */}
+          <Route element={<AppLayout />}>
 
-          {/* Routes Équipe Terrain & Assurance */}
-          <Route element={<ProtectedRoute allowedRoles={['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN']} />}>
-            <Route path="/declarations/new" element={<NewDeclarationPage />} />
-          </Route>
+            {/* Routes Protégées - Tout rôle connecté */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
+            </Route>
 
-          {/* Routes Déclarations (liste) */}
-          <Route element={<ProtectedRoute allowedRoles={['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'HSE', 'LEGAL', 'ADMIN']} />}>
-            <Route path="/declarations" element={<DeclarationsPage />} />
-            <Route path="/declarations/completer/:id" element={<DossierCompleterDetailPage />} />
-          </Route>
+            {/* Routes Équipe Terrain & Assurance */}
+            <Route element={<ProtectedRoute allowedRoles={['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN']} />}>
+              <Route path="/declarations/new" element={<NewDeclarationPage />} />
+            </Route>
 
-          {/* Routes Validation/Gestion (Assurance, Légal, HSE, Ingénieur) */}
-          <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'LEGAL', 'HSE', 'INGENIEUR', 'ADMIN']} />}>
-            <Route path="/declarations/valider/:id" element={<DossierValidationPage />} />
-            <Route path="/gestion" element={<GestionDossiersPage />} />
-            <Route path="/gestion/:id" element={<DossierGestionDetailPage />} />
-          </Route>
+            {/* Routes Déclarations (liste) */}
+            <Route element={<ProtectedRoute allowedRoles={['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'HSE', 'LEGAL', 'ADMIN']} />}>
+              <Route path="/declarations" element={<DeclarationsPage />} />
+              <Route path="/declarations/completer/:id" element={<DossierCompleterDetailPage />} />
+            </Route>
 
-          {/* Routes Archives */}
-          <Route element={<ProtectedRoute allowedRoles={['LEGAL', 'ASSURANCE', 'ADMIN', 'HSE', 'INGENIEUR']} />}>
-            <Route path="/archives" element={<ArchivesPage />} />
-          </Route>
+            {/* Routes Validation/Gestion (Assurance, Légal, HSE, Ingénieur) */}
+            <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'LEGAL', 'HSE', 'INGENIEUR', 'ADMIN']} />}>
+              <Route path="/declarations/valider/:id" element={<DossierValidationPage />} />
+              <Route path="/gestion" element={<GestionDossiersPage />} />
+              <Route path="/gestion/:id" element={<DossierGestionDetailPage />} />
+            </Route>
 
-          {/* Routes Statistiques (Assurance / Admin) */}
-          <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'ADMIN']} />}>
-            <Route path="/statistiques-delais" element={<StatistiquesDelaisPage />} />
-          </Route>
+            {/* Routes Archives */}
+            <Route element={<ProtectedRoute allowedRoles={['LEGAL', 'ASSURANCE', 'ADMIN', 'HSE', 'INGENIEUR']} />}>
+              <Route path="/archives" element={<ArchivesPage />} />
+            </Route>
 
-          {/* Routes Paramètres (Directrice Assurance / Admin / Ingénieur pour Équipements) */}
-          <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'ADMIN', 'INGENIEUR']} />}>
-            <Route path="/settings" element={<SettingsPage />} />
+            {/* Routes Statistiques (Assurance / Admin) */}
+            <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'ADMIN']} />}>
+              <Route path="/statistiques-delais" element={<StatistiquesDelaisPage />} />
+            </Route>
+
+            {/* Routes Paramètres */}
+            <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'ADMIN', 'INGENIEUR']} />}>
+              <Route path="/settings" element={<SettingsPage />} />
+            </Route>
+
           </Route>
         </Routes>
       </BrowserRouter>

@@ -1,6 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from '../../../componenets/Sidebar/Sidebar';
 import { AuthContext } from '../../../context/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../../../api';
@@ -58,21 +57,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="pr-layout">
-      <Sidebar />
-      <div className="pr-main">
-        {/* TOPBAR */}
-        <header className="pr-topbar">
-          <div className="pr-topbar-actions">
-            <button className="pr-icon-btn" onClick={() => navigate('/notifications')}>
-              <IconBell />
-            </button>
-            <button className="pr-icon-btn pr-icon-btn--active" onClick={() => navigate('/profile')}>
-              <IconUserC />
-            </button>
-          </div>
-        </header>
-
+    <div className="pr-page-content">
         {/* CONTENT */}
         <div className="pr-content">
           <div className="pr-header">
@@ -140,7 +125,6 @@ export default function Profile() {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { toast } from 'react-toastify'
 import { AuthContext } from '../../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../../../api'
-import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './Settings.css'
 
 const ROLES = [
@@ -188,20 +187,7 @@ export default function Settings() {
   const ef = (field, val) => setEqForm(p => ({ ...p, [field]: val }))
 
   return (
-    <div className="st-layout">
-      <Sidebar />
-      <div className="st-main">
-        <header className="st-topbar">
-          <div className="st-topbar-actions">
-            <button className="st-icon-btn" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
-              <IconBell />
-              {unreadNotifsCount > 0 && <span className="st-notif-dot" style={{position: 'absolute', top: 8, right: 10, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
-            </button>
-            <button className="st-icon-btn" onClick={() => navigate('/profile')}>
-              <IconUserC />
-            </button>
-          </div>
-        </header>
+    <div className="st-page-content">
         <main className="st-content">
           <header className="st-header"><h1>PARAMÈTRES</h1><p>Gérez les sites, les comptes utilisateurs et les équipements.</p></header>
 
@@ -461,7 +447,6 @@ export default function Settings() {
           )}
 
         </main>
-      </div>
     </div>
   )
 }

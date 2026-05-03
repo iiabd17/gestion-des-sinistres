@@ -3,7 +3,6 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { AuthContext } from '../../../context/AuthContext'
 import api from '../../../api'
-import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import AssuranceDashboardStats from './AssuranceDashboardStats'
 import IngenieurDashboardStats from './IngenieurDashboardStats'
 import LegalDashboardStats from './LegalDashboardStats'
@@ -84,28 +83,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="db-layout">
-
-      <Sidebar />
-
-      {/* ── Main area ──────────────────────────────── */}
-      <div className="db-main">
-
-        {/* top bar */}
-        <header className="db-topbar">
-          <div className="db-topbar-actions">
-            <button className="db-icon-btn" aria-label="Notifications" onClick={() => navigate('/notifications')} style={{position: 'relative'}}>
-              <IconBell />
-              {unreadNotifsCount > 0 && <span className="db-notif-dot" style={{position: 'absolute', top: 8, right: 8, width: 8, height: 8, backgroundColor: '#E2000F', borderRadius: '50%', border: '2px solid #fff'}} />}
-            </button>
-            <button className="db-icon-btn db-avatar" aria-label="Profil" onClick={() => navigate('/profile')}>
-              <IconUser />
-            </button>
-            <span style={{ fontSize: '0.85rem', color: '#4A5568', fontWeight: 500 }}>
-              {userName}
-            </span>
-          </div>
-        </header>
+    <div className="db-page-content">
 
         {/* page content */}
         <main className="db-content">
@@ -198,7 +176,6 @@ export default function Dashboard() {
             </section>
           </div>
         </main>
-      </div>
 
       {/* FAB */}
       {['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN'].includes(user?.role) && (
