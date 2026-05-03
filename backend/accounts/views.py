@@ -237,8 +237,9 @@ class DeleteUserView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+
 from .serializers import CustomTokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
+    serializer_class = CustomTokenObtainPairSerializer
