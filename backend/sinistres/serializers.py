@@ -114,6 +114,7 @@ class SinistreListSerializer(serializers.ModelSerializer):
     nomSite            = serializers.CharField(source='site.nomSite', read_only=True)
     wilaya             = serializers.CharField(source='site.wilaya', read_only=True)
     createur_nom       = serializers.SerializerMethodField(read_only=True)
+    dernier_mouvement  = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model  = Sinistre
@@ -122,8 +123,16 @@ class SinistreListSerializer(serializers.ModelSerializer):
             'typeSinistre', 'typeSinistre_label',
             'dateSurvenance', 'statut', 'statut_label', 'urgence',
             'codeSite', 'nomSite', 'wilaya', 'montantEstime',
-            'dateCreation', 'createur', 'createur_nom',
+            'dateCreation', 'createur', 'createur_nom', 'dernier_mouvement',
         ]
+
+    def get_dernier_mouvement(self, obj):
+        # On récupère le dernier changement de statut
+        # Note: On utilise historiqueStatuts.all()[0] si on a déjà préchargé ou .first()
+        latest = obj.historiqueStatuts.first()
+        if latest:
+            return latest.dateChangement
+        return obj.dateCreation
 
     def get_createur_nom(self, obj):
         if obj.createur:

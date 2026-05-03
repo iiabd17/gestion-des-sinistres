@@ -6,6 +6,7 @@ import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import { AuthContext } from '../../../context/AuthContext'
 import './DossierValidation.css'
 import './DossierCompleterDetail.css'
+import ClaimTimeline from '../../ClaimTimeline/ClaimTimeline'
 
 /* ── Nature → badge style ─────────────────── */
 const NATURE_STYLES = {
@@ -158,6 +159,8 @@ export default function DossierCompleterDetail() {
         </header>
 
         <main className="dv-content">
+          <ClaimTimeline currentStatus={data.statut} />
+
           {/* ── Page header ── */}
           <div className="dv-page-header">
             <div className="dv-page-meta">

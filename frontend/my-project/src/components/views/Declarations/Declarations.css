@@ -267,6 +267,38 @@
 .dcl-table tbody tr:hover { background: #fafafa; }
 .dcl-row--selected { background: #fff5f5 !important; }
 
+/* Urgency / Delay */
+.dcl-row--urgent {
+  background: #fffafa;
+  border-left: 3px solid #E2000F !important;
+}
+
+.dcl-delay-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.dcl-delay-badge--warning {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.dcl-delay-badge--danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(226, 0, 15, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(226, 0, 15, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(226, 0, 15, 0); }
+}
+
 /* Row number */
 .dcl-row-num {
   font-size: 11px;
@@ -335,6 +367,114 @@
   box-shadow: 0 2px 8px rgba(226,0,15,.2);
 }
 .dcl-complete-btn:hover { background: #c0000c; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(226,0,15,.3); }
+
+/* Photo Preview & Export */
+.dcl-action-group {
+  display: flex;
+  gap: 6px;
+}
+
+.dcl-photo-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dcl-photo-btn:hover {
+  background: #f1f5f9;
+  color: #E2000F;
+  border-color: #E2000F;
+}
+
+.dcl-export-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #E2000F;
+  background: #fff;
+  color: #E2000F;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dcl-export-btn:hover {
+  background: #E2000F;
+  color: #fff;
+}
+
+/* Photo Modal Gallery */
+.photo-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.photo-modal-content {
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+  max-width: 800px;
+  width: 90%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.photo-modal-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 32px;
+  cursor: pointer;
+}
+
+.photo-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.gallery-item {
+  aspect-ratio: 4/3;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+  border: 1px solid #eee;
+}
+
+.gallery-item:hover {
+  transform: scale(1.02);
+}
 
 /* ── Right panel ────────────────────────────────────── */
 .dcl-panel {

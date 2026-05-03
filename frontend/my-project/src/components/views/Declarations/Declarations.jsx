@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { AuthContext } from '../../../context/AuthContext'
 import api from '../../../api'
+import { toast } from 'react-toastify'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import './Declarations.css'
 
@@ -39,7 +40,14 @@ export default function Declarations() {
   // Filters
   const [filterNature, setFilterNature] = useState('Tous')
   const [filterDate, setFilterDate] = useState('')
+  const [filterWilaya, setFilterWilaya] = useState('Tous')
+  const [filterStatut, setFilterStatut] = useState('Tous')
   const [natures, setNatures] = useState([])
+  const [wilayas, setWilayas] = useState([])
+
+  // Gallery Modal
+  const [showGallery, setShowGallery] = useState(false)
+  const [selectedSinistre, setSelectedSinistre] = useState(null)
 
   // Charger les constantes
   useEffect(() => {
@@ -60,7 +68,12 @@ export default function Declarations() {
     ]).then(([openRes, rejectRes]) => {
       const open = openRes.data?.results || openRes.data || []
       const rejected = rejectRes.data?.results || rejectRes.data || []
-      setDossiersCompleter([...open, ...rejected])
+      const combined = [...open, ...rejected]
+      setDossiersCompleter(combined)
+      
+      // Extract unique wilayas
+      const w = [...new Set(combined.map(d => d.wilaya))].filter(Boolean).sort()
+      setWilayas(prev => [...new Set([...prev, ...w])])
     }).finally(() => setLoadingCompleter(false))
   }, [])
 
@@ -77,12 +90,69 @@ export default function Declarations() {
     }).finally(() => setLoadingValider(false))
   }, [])
 
+  // Helper to calculate delay in hours
+  const getDelayInfo = (dateStr) => {
+    if (!dateStr) return { hours: 0, label: 'N/A', level: 'none' }
+    const diffMs = new Date() - new Date(dateStr)
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    
+    let label = `${diffHours}h`
+    if (diffHours >= 24) label = `${Math.floor(diffHours / 24)}j`
+    
+    let level = 'none'
+    if (diffHours > 72) level = 'danger'
+    else if (diffHours > 24) level = 'warning'
+    
+    return { hours: diffHours, label, level }
+  }
+
   // Filtrage côté frontend
   const filteredCompleter = dossiersCompleter.filter(d => {
     if (filterNature !== 'Tous' && d.nature !== filterNature) return false
     if (filterDate && d.dateSurvenance !== filterDate) return false
+    if (filterWilaya !== 'Tous' && d.wilaya !== filterWilaya) return false
     return true
   })
+
+  const filteredValider = dossiersValider.filter(d => {
+    if (filterNature !== 'Tous' && d.nature !== filterNature) return false
+    if (filterDate && d.dateSurvenance !== filterDate) return false
+    if (filterWilaya !== 'Tous' && d.wilaya !== filterWilaya) return false
+    if (filterStatut !== 'Tous' && d.statut !== filterStatut) return false
+    return true
+  })
+
+  const handleExportCSV = () => {
+    const list = tab === 'completer' ? filteredCompleter : filteredValider
+    if (list.length === 0) return toast.info("Rien à exporter")
+    
+    const headers = ["ID", "Site", "Wilaya", "Date", "Nature", "Statut", "Montant"]
+    const rows = list.map(d => [
+      d.idSinistre, d.codeSite, d.wilaya, d.dateSurvenance, d.nature_label, d.statut_label, d.montantEstime
+    ])
+    
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + rows.map(e => e.join(",")).join("\n")
+
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `sinistres_${tab}_${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success("Export terminé")
+  }
+
+  const openGallery = (sinistre) => {
+    api.get(`/sinistres/${sinistre.idSinistre}/`)
+      .then(res => {
+        setSelectedSinistre(res.data)
+        setShowGallery(true)
+      })
+      .catch(() => toast.error("Erreur chargement photos"))
+  }
 
   return (
     <div className="dcl-layout">
@@ -132,14 +202,30 @@ export default function Declarations() {
             <div className="dcl-body" style={{ flexDirection: 'row' }}>
               <div className="dcl-table-col" style={{ flex: 1 }}>
                 <div className="dcl-section-head" style={{ marginBottom: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div>
-                      <h1 className="dcl-title">Déclarations à Compléter</h1>
-                      <p className="dcl-subtitle">
-                        {dossiersCompleter.length} dossier(s) nécessitent une expertise technique
-                      </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', justifyContent: 'space-between' }}>
+                      <div>
+                        <h1 className="dcl-title">Déclarations à Compléter</h1>
+                        <p className="dcl-subtitle">
+                          {filteredCompleter.length} dossier(s) nécessitent une expertise technique
+                        </p>
+                      </div>
+                      <div className="dcl-action-group">
+                        {['EQUIPE_TERRAIN', 'ADMIN'].includes(role) && (
+                          <button 
+                            className="dcl-export-btn" 
+                            style={{ background: '#E2000F', color: '#fff' }}
+                            onClick={() => navigate('/declarations/new')}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                            Nouveau
+                          </button>
+                        )}
+                        <button className="dcl-export-btn" onClick={handleExportCSV}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          Exporter
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
                   {/* Filters */}
                   <div className="dcl-filter-grid">
@@ -160,8 +246,20 @@ export default function Declarations() {
                         value={filterNature}
                         onChange={(e) => setFilterNature(e.target.value)}
                       >
-                        <option value="Tous">Tous</option>
+                        <option value="Tous">Natures</option>
                         {natures.map(n => <option key={n.code} value={n.code}>{n.label}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="dcl-filter-field">
+                      <label>WILAYA</label>
+                      <select
+                        className="dcl-filter-select"
+                        value={filterWilaya}
+                        onChange={(e) => setFilterWilaya(e.target.value)}
+                      >
+                        <option value="Tous">Wilayas</option>
+                        {wilayas.map(w => <option key={w} value={w}>{w}</option>)}
                       </select>
                     </div>
 
@@ -170,6 +268,7 @@ export default function Declarations() {
                       onClick={() => {
                         setFilterDate('');
                         setFilterNature('Tous');
+                        setFilterWilaya('Tous');
                       }}
                       title="Réinitialiser les filtres"
                     >
@@ -190,6 +289,7 @@ export default function Declarations() {
                         <th>SITE</th>
                         <th>DATE</th>
                         <th>NATURE</th>
+                        <th>DÉLAI</th>
                         <th>STATUT</th>
                         <th>ACTION</th>
                       </tr>
@@ -197,8 +297,9 @@ export default function Declarations() {
                     <tbody>
                       {filteredCompleter.map((d) => {
                         const badge = statutBadge[d.statut] || { bg: '#f0f0f0', color: '#555' }
+                        const delay = getDelayInfo(d.dernier_mouvement)
                         return (
-                          <tr key={d.idSinistre}>
+                          <tr key={d.idSinistre} className={delay.level === 'danger' ? 'dcl-row--urgent' : ''}>
                             <td className="dcl-id">{d.idSinistre}</td>
                             <td>
                               <span className="dcl-site">{d.codeSite}</span>
@@ -216,6 +317,11 @@ export default function Declarations() {
                               </span>
                             </td>
                             <td>
+                              <span className={`dcl-delay-badge dcl-delay-badge--${delay.level}`}>
+                                {delay.label}
+                              </span>
+                            </td>
+                            <td>
                               <span className="dcl-badge-attente"
                                 style={{ background: badge.bg, color: badge.color }}>
                                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: badge.color, display: 'inline-block', marginRight: 4 }} />
@@ -223,13 +329,18 @@ export default function Declarations() {
                               </span>
                             </td>
                             <td>
-                              <button
-                                className="dcl-complete-btn"
-                                style={{ background: '#fce7f3', color: '#be185d', boxShadow: 'none' }}
-                                onClick={() => navigate(`/declarations/completer/${d.idSinistre}`)}
-                              >
-                                Compléter
-                              </button>
+                              <div className="dcl-action-group">
+                                <button className="dcl-photo-btn" onClick={() => openGallery(d)} title="Voir les photos">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                </button>
+                                <button
+                                  className="dcl-complete-btn"
+                                  style={{ background: '#fce7f3', color: '#be185d', boxShadow: 'none' }}
+                                  onClick={() => navigate(`/declarations/completer/${d.idSinistre}`)}
+                                >
+                                  Compléter
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         )
@@ -247,8 +358,35 @@ export default function Declarations() {
           {tab === 'valider' && (
             <div className="dcl-val-container">
               <div className="dcl-val-head">
-                <h1 className="dcl-title">Déclarations à Valider</h1>
-                <p className="dcl-subtitle">Dossiers expertisés en attente de décision</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div>
+                    <h1 className="dcl-title">Déclarations à Valider</h1>
+                    <p className="dcl-subtitle">Dossiers expertisés en attente de décision</p>
+                  </div>
+                  <button className="dcl-export-btn" onClick={handleExportCSV}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Exporter
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters for Valider */}
+              <div className="dcl-filter-grid" style={{ marginBottom: 0 }}>
+                <div className="dcl-filter-field">
+                  <label>WILAYA</label>
+                  <select className="dcl-filter-select" value={filterWilaya} onChange={(e) => setFilterWilaya(e.target.value)}>
+                    <option value="Tous">Wilayas</option>
+                    {wilayas.map(w => <option key={w} value={w}>{w}</option>)}
+                  </select>
+                </div>
+                <div className="dcl-filter-field">
+                  <label>STATUT</label>
+                  <select className="dcl-filter-select" value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)}>
+                    <option value="Tous">Statuts</option>
+                    <option value="EN_EXPERTISE">En Expertise</option>
+                    <option value="ATTENTE_VALIDATION_FRANCHISE">Attente Franchise</option>
+                  </select>
+                </div>
               </div>
 
               {/* Stat strip */}
@@ -280,24 +418,32 @@ export default function Declarations() {
                         <th>ID DOSSIER</th>
                         <th>SITE</th>
                         <th>DATE</th>
+                        <th>DÉLAI</th>
                         <th>NATURE</th>
                         <th>MONTANT ESTIMÉ</th>
                         <th>ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dossiersValider.map(d => (
-                        <tr key={d.idSinistre}>
-                          <td className="dcl-id">{d.idSinistre}</td>
-                          <td>
-                            <span className="dcl-site">{d.codeSite}</span>
-                            <span className="dcl-ville">{d.wilaya}</span>
-                          </td>
-                          <td className="dcl-date">
-                            {new Date(d.dateSurvenance).toLocaleDateString('fr-FR', {
-                              day: 'numeric', month: 'short', year: 'numeric'
-                            })}
-                          </td>
+                      {filteredValider.map(d => {
+                        const delay = getDelayInfo(d.dernier_mouvement)
+                        return (
+                          <tr key={d.idSinistre} className={delay.level === 'danger' ? 'dcl-row--urgent' : ''}>
+                            <td className="dcl-id">{d.idSinistre}</td>
+                            <td>
+                              <span className="dcl-site">{d.codeSite}</span>
+                              <span className="dcl-ville">{d.wilaya}</span>
+                            </td>
+                            <td className="dcl-date">
+                              {new Date(d.dateSurvenance).toLocaleDateString('fr-FR', {
+                                day: 'numeric', month: 'short', year: 'numeric'
+                              })}
+                            </td>
+                            <td>
+                              <span className={`dcl-delay-badge dcl-delay-badge--${delay.level}`}>
+                                {delay.label}
+                              </span>
+                            </td>
                           <td>
                             <span className="dcl-nature-badge"
                               style={{ background: '#dbeafe', color: '#1d4ed8' }}>
@@ -310,17 +456,23 @@ export default function Declarations() {
                             </span>
                             <span className="dcl-montant-devise">DZD</span>
                           </td>
-                          <td>
-                            <button
-                              className="dcl-view-btn"
-                              aria-label="Voir le dossier"
-                              onClick={() => navigate(`/declarations/valider/${d.idSinistre}`)}
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            <td>
+                              <div className="dcl-action-group">
+                                <button className="dcl-photo-btn" onClick={() => openGallery(d)} title="Voir les photos">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                </button>
+                                <button
+                                  className="dcl-view-btn"
+                                  aria-label="Voir le dossier"
+                                  onClick={() => navigate(`/declarations/valider/${d.idSinistre}`)}
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -328,6 +480,27 @@ export default function Declarations() {
             </div>
           )}
         </main>
+
+        {/* Gallery Modal */}
+        {showGallery && (
+          <div className="photo-modal-overlay" onClick={() => setShowGallery(false)}>
+            <div className="photo-modal-content" onClick={e => e.stopPropagation()}>
+              <button className="photo-modal-close" onClick={() => setShowGallery(false)}>&times;</button>
+              <h2 style={{margin:0, fontSize:18}}>Photos - {selectedSinistre?.idSinistre}</h2>
+              <div className="photo-gallery">
+                {selectedSinistre?.piecesJointes?.filter(p => /\.(jpg|jpeg|png|webp)$/i.test(p.fichier)).map((p, i) => {
+                  const url = p.fichier.startsWith('http') ? p.fichier : `http://localhost:8000${p.fichier}`
+                  return (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="gallery-item" style={{backgroundImage: `url(${url})`}} />
+                  )
+                })}
+                {selectedSinistre?.piecesJointes?.filter(p => /\.(jpg|jpeg|png|webp)$/i.test(p.fichier)).length === 0 && (
+                  <p style={{color:'#64748b', gridColumn:'1/-1', textAlign:'center', padding:40}}>Aucune photo disponible</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

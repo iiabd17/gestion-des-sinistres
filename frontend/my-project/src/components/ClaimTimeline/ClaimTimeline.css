@@ -1,0 +1,92 @@
+.timeline-container {
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.timeline-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  min-width: 800px;
+  position: relative;
+}
+
+.timeline-progress-bar {
+  position: absolute;
+  top: 15px;
+  left: 5%;
+  right: 5%;
+  height: 2px;
+  background: #E2E8F0;
+  z-index: 1;
+}
+
+.timeline-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #E2000F;
+  transition: width 0.5s ease;
+}
+
+.timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  width: 80px;
+}
+
+.timeline-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+
+.timeline-step--active .timeline-dot {
+  border-color: #E2000F;
+  background: #E2000F;
+  color: white;
+  box-shadow: 0 0 0 4px rgba(226, 0, 15, 0.1);
+}
+
+.timeline-step--completed .timeline-dot {
+  border-color: #E2000F;
+  background: #E2000F;
+  color: white;
+}
+
+.timeline-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  line-height: 1.2;
+}
+
+.timeline-step--active .timeline-label {
+  color: #0F172A;
+}
+
+.timeline-step--completed .timeline-label {
+  color: #0F172A;
+}
+
+.timeline-icon {
+  width: 16px;
+  height: 16px;
+}

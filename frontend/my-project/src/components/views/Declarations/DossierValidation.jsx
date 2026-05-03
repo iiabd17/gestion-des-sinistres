@@ -7,6 +7,7 @@ import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import { AuthContext } from '../../../context/AuthContext'
 import './DossierValidation.css'
 import './DossierCompleterDetail.css'
+import ClaimTimeline from '../../ClaimTimeline/ClaimTimeline'
 
 const NATURE_STYLES = {
   'INCENDIE':            { bg: '#fef9c3', color: '#a16207' },
@@ -199,6 +200,8 @@ export default function DossierValidation() {
         </header>
 
         <main className="dv-content">
+          <ClaimTimeline currentStatus={data.statut} />
+
           {/* Page header */}
           <div className="dv-page-header">
             <div className="dv-page-meta">
