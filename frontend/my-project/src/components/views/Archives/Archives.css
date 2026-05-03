@@ -14,6 +14,37 @@
   min-width: 0;
 }
 
+/* ── Top Bar ────────────────────────────────────────── */
+.arc-topbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 32px;
+  background: #fff;
+  border-bottom: 1px solid #edf2f7;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.arc-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.arc-icon-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid #edf2f7;
+  background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #718096;
+  transition: all .2s;
+}
+.arc-icon-btn:hover { background: #f7fafc; border-color: #cbd5e0; }
+
 /* ── Content ────────────────────────────────────────── */
 .arc-content {
   padding: 40px;
