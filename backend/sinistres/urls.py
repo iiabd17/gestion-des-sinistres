@@ -100,16 +100,6 @@ urlpatterns = [
          views.MarkNotificationReadView.as_view(),
          name='notification-read'),
 
-    # ── Statistiques (Dashboard) ──
-    path('statistiques/',
-         views.StatistiquesView.as_view(),
-         name='statistiques'),
-    path('stats/assurance/',
-         views.StatistiquesAssuranceView.as_view(),
-         name='stats-assurance'),
-    path('stats/delais-detail/',
-         views.StatistiquesDelaisDetailView.as_view(),
-         name='stats-delais-detail'),
 
     # Validation Franchise (Assurance)
     path('<str:pk>/validation-franchise/', views.SinistreValidationFranchiseView.as_view(), name='sinistre-validation-franchise'),

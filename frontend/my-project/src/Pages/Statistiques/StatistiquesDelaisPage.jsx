@@ -118,8 +118,6 @@ export default function StatistiquesDelaisPage() {
                       tick={{fill: '#64748B', fontSize: 12}} 
                       axisLine={false} 
                       tickLine={false} 
-                      angle={-45}
-                      textAnchor="end"
                       dy={10}
                     />
                     <YAxis 
