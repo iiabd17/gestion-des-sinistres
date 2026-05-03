@@ -21,8 +21,8 @@ export default function Sidebar() {
   const navItems = [
     { id: 'tableau', label: 'Tableau de Bord', path: '/dashboard', icon: IconGrid, roles: ['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'LEGAL', 'HSE', 'ADMIN'] },
     { id: 'declarations', label: 'Déclarations', path: '/declarations', icon: IconDoc, roles: ['EQUIPE_TERRAIN', 'INGENIEUR', 'ASSURANCE', 'ADMIN'] },
-    { id: 'gestion', label: 'Gestion des dossiers', path: '/gestion', icon: IconFolder, roles: ['ASSURANCE', 'LEGAL', 'HSE', 'ADMIN'] },
-    { id: 'archives', label: 'Archives', path: '/archives', icon: IconArchive, roles: ['ASSURANCE', 'LEGAL', 'HSE', 'ADMIN'] },
+    { id: 'gestion', label: 'Gestion des dossiers', path: '/gestion', icon: IconFolder, roles: ['ASSURANCE', 'LEGAL', 'HSE', 'INGENIEUR', 'ADMIN'] },
+    { id: 'archives', label: 'Archives', path: '/archives', icon: IconArchive, roles: ['ASSURANCE', 'LEGAL', 'HSE', 'INGENIEUR', 'ADMIN'] },
     { id: 'delais', label: 'Analyse Délais', path: '/statistiques-delais', icon: IconClock, roles: ['ASSURANCE', 'ADMIN'] },
   ]
 

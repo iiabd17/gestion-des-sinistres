@@ -20,6 +20,7 @@ export default function GestionDossiers() {
   const [filterNature, setFilterNature] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Constants from backend
   const [natures, setNatures] = useState([])
@@ -118,6 +119,19 @@ export default function GestionDossiers() {
                 <input type="date" className="gd-date-input" value={dateTo} onChange={e => setDateTo(e.target.value)} />
               </div>
             </div>
+            <div className="gd-filter-item" style={{ flex: 1.5 }}>
+              <label>RECHERCHER</label>
+              <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', height: '38px' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16, height:16, marginRight: 8, flexShrink: 0}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input 
+                  type="text" 
+                  placeholder="Rechercher par ID..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ border: 'none', outline: 'none', width: '100%', fontSize: '13px', fontWeight: 600, color: '#2d3748', background: 'transparent' }}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Table */}
@@ -140,7 +154,9 @@ export default function GestionDossiers() {
                   </tr>
                 </thead>
                 <tbody>
-                  {dossiers.map(d => (
+                  {dossiers
+                    .filter(d => searchTerm ? d.idSinistre?.toLowerCase().includes(searchTerm.toLowerCase()) : true)
+                    .map(d => (
                     <tr key={d.idSinistre}>
                       <td className="gd-id-cell">{d.idSinistre}</td>
                       <td className="gd-date-cell">

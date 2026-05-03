@@ -13,26 +13,44 @@ from accounts.permissions import IsAssurance
 #  STATISTIQUES (Dashboard)
 # ═════════════════════════════════════════════
 
+HSE_NATURES = ['INCENDIE', 'CATASTROPHE_NATUREL', 'INTEMPERIE', 'VIOLENCE_POLITIQUE']
+
+
+def _get_role_queryset(user):
+    """Retourne le queryset de sinistres filtré selon le rôle de l'utilisateur."""
+    if hasattr(user, 'equipeterrain'):
+        return Sinistre.objects.filter(createur=user)
+    elif hasattr(user, 'legal'):
+        return Sinistre.objects.filter(nature='VOL')
+    elif hasattr(user, 'hse'):
+        return Sinistre.objects.filter(nature__in=HSE_NATURES)
+    else:
+        return Sinistre.objects.all()
+
+
 class StatistiquesView(APIView):
     """
     GET /api/statistiques/
-    Retourne les compteurs globaux pour le tableau de bord.
+    Retourne les compteurs globaux pour le tableau de bord,
+    filtrés selon le rôle de l'utilisateur connecté.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        total = Sinistre.objects.count()
+        qs = _get_role_queryset(request.user)
+
+        total = qs.count()
         par_statut = dict(
-            Sinistre.objects.values_list('statut')
+            qs.values_list('statut')
             .annotate(count=Count('idSinistre'))
             .values_list('statut', 'count')
         )
         par_nature = dict(
-            Sinistre.objects.values_list('nature')
+            qs.values_list('nature')
             .annotate(count=Count('idSinistre'))
             .values_list('nature', 'count')
         )
-        montant_total = Sinistre.objects.aggregate(
+        montant_total = qs.aggregate(
             total=Sum('montantEstime')
         )['total'] or 0
 
@@ -50,6 +68,145 @@ class StatistiquesView(APIView):
             'parNature':            par_nature,
             'montantTotalEstime':   montant_total,
         })
+
+
+class StatistiquesDashboardView(APIView):
+    """
+    GET /api/statistiques/dashboard/
+    Retourne les KPIs spécifiques au rôle de l'utilisateur connecté.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        if hasattr(user, 'assurance') or user.is_staff or user.is_superuser:
+            return Response(self._kpi_assurance())
+        elif hasattr(user, 'ingenieur'):
+            return Response(self._kpi_ingenieur())
+        elif hasattr(user, 'legal'):
+            return Response(self._kpi_legal())
+        elif hasattr(user, 'hse'):
+            return Response(self._kpi_hse())
+        elif hasattr(user, 'equipeterrain'):
+            return Response(self._kpi_equipe_terrain(user))
+        else:
+            return Response({'role': 'UNKNOWN', 'kpis': []})
+
+    def _kpi_assurance(self):
+        qs = Sinistre.objects.all()
+        total = qs.count()
+        ouverts = qs.filter(statut__in=['OUVERT', 'EN_EXPERTISE', 'REJET_POUR_COMPLEMENT',
+                                         'TRANSMIS_ASSUREUR', 'EN_VALIDATION_LEGAL',
+                                         'EN_VALIDATION_HSE', 'ATTENTE_VALIDATION_FRANCHISE']).count()
+        clotures = qs.filter(statut__in=['CLOTURE', 'ARCHIVE', 'VALIDE', 'REJETE', 'CLOTURE_SOUS_FRANCHISE']).count()
+        montant = qs.aggregate(total=Sum('montantEstime'))['total'] or 0
+        sous_franchise = qs.filter(statut='CLOTURE_SOUS_FRANCHISE').count()
+        par_nature = dict(
+            qs.values_list('nature').annotate(count=Count('idSinistre')).values_list('nature', 'count')
+        )
+        nature_labels = dict(NATURE_CHOICES)
+
+        return {
+            'role': 'ASSURANCE',
+            'kpis': [
+                {'key': 'total', 'label': 'Total Sinistres', 'value': total},
+                {'key': 'ouverts', 'label': 'Dossiers Ouverts', 'value': ouverts},
+                {'key': 'clotures', 'label': 'Dossiers Clôturés', 'value': clotures},
+                {'key': 'montant', 'label': 'Impact Financier Total (DZD)', 'value': float(montant)},
+                {'key': 'sous_franchise', 'label': 'Clôturés Sous Franchise', 'value': sous_franchise},
+            ],
+            'par_nature': [
+                {'nature': k, 'label': nature_labels.get(k, k), 'count': v}
+                for k, v in par_nature.items()
+            ],
+        }
+
+    def _kpi_ingenieur(self):
+        qs = Sinistre.objects.all()
+        en_attente = qs.filter(statut__in=['OUVERT', 'REJET_POUR_COMPLEMENT']).count()
+        now = timezone.now()
+        debut_mois = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        # Expertises complétées ce mois (transitions vers EN_EXPERTISE ce mois)
+        expertises_mois = HistoriqueStatut.objects.filter(
+            nouveauStatut='EN_EXPERTISE',
+            dateChangement__gte=debut_mois,
+        ).count()
+
+        # Temps moyen d'expertise (OUVERT → EN_EXPERTISE)
+        from collections import defaultdict
+        historiques = HistoriqueStatut.objects.filter(
+            nouveauStatut__in=['OUVERT', 'EN_EXPERTISE']
+        ).order_by('sinistre_id', 'dateChangement')
+
+        durations = []
+        last_ouvert = {}
+        for h in historiques:
+            if h.nouveauStatut == 'OUVERT':
+                last_ouvert[h.sinistre_id] = h.dateChangement
+            elif h.nouveauStatut == 'EN_EXPERTISE' and h.sinistre_id in last_ouvert:
+                dur = (h.dateChangement - last_ouvert[h.sinistre_id]).total_seconds()
+                durations.append(dur)
+
+        avg_hours = round(sum(durations) / len(durations) / 3600, 1) if durations else 0
+
+        urgents = qs.filter(statut__in=['OUVERT', 'REJET_POUR_COMPLEMENT'], urgence='ELEVEE').count()
+
+        return {
+            'role': 'INGENIEUR',
+            'kpis': [
+                {'key': 'en_attente', 'label': "En Attente d'Expertise", 'value': en_attente},
+                {'key': 'expertises_mois', 'label': 'Expertises ce Mois', 'value': expertises_mois},
+                {'key': 'temps_moyen', 'label': "Temps Moyen d'Expertise (h)", 'value': avg_hours},
+                {'key': 'urgents', 'label': 'Dossiers Urgents', 'value': urgents},
+            ],
+        }
+
+    def _kpi_legal(self):
+        qs = Sinistre.objects.filter(nature='VOL')
+        en_attente_pv = qs.filter(statut='EN_VALIDATION_LEGAL').count()
+        valides = qs.filter(statut__in=['TRANSMIS_ASSUREUR', 'VALIDE', 'CLOTURE', 'ARCHIVE']).count()
+        total_vol = qs.count()
+
+        return {
+            'role': 'LEGAL',
+            'kpis': [
+                {'key': 'en_attente_pv', 'label': 'En Attente du PV de Police', 'value': en_attente_pv},
+                {'key': 'valides', 'label': 'Dossiers Légaux Validés', 'value': valides},
+                {'key': 'total_vol', 'label': 'Total Dossiers VOL', 'value': total_vol},
+            ],
+        }
+
+    def _kpi_hse(self):
+        qs = Sinistre.objects.filter(nature__in=HSE_NATURES)
+        en_attente_rapport = qs.filter(statut='EN_VALIDATION_HSE').count()
+        valides = qs.filter(statut__in=['TRANSMIS_ASSUREUR', 'VALIDE', 'CLOTURE', 'ARCHIVE']).count()
+        total_incidents = qs.count()
+
+        return {
+            'role': 'HSE',
+            'kpis': [
+                {'key': 'en_attente_rapport', 'label': 'En Attente Rapport HSE', 'value': en_attente_rapport},
+                {'key': 'valides', 'label': 'Validations HSE Complétées', 'value': valides},
+                {'key': 'total_incidents', 'label': 'Total Incidents Sécurité', 'value': total_incidents},
+            ],
+        }
+
+    def _kpi_equipe_terrain(self, user):
+        qs = Sinistre.objects.filter(createur=user)
+        total = qs.count()
+        actifs = qs.exclude(statut__in=['CLOTURE', 'ARCHIVE', 'CLOTURE_SOUS_FRANCHISE', 'REJETE']).count()
+        clotures = qs.filter(statut__in=['CLOTURE', 'ARCHIVE', 'CLOTURE_SOUS_FRANCHISE']).count()
+
+        return {
+            'role': 'EQUIPE_TERRAIN',
+            'kpis': [
+                {'key': 'actifs', 'label': 'Mes Déclarations Actives', 'value': actifs},
+                {'key': 'clotures', 'label': 'Mes Déclarations Clôturées', 'value': clotures},
+                {'key': 'total', 'label': 'Total Mes Déclarations', 'value': total},
+            ],
+        }
 
 
 # ═════════════════════════════════════════════

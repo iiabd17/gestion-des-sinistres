@@ -28,6 +28,60 @@ const PERIODE_OPTIONS = [
 
 const BAR_COLORS = ['#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#14B8A6', '#E2000F'];
 
+function CustomSelect({ value, onChange, options }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selected = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className="sd-custom-select" ref={dropdownRef}>
+      <button 
+        type="button"
+        className={`sd-select-trigger ${isOpen ? 'sd-select-trigger--open' : ''}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="sd-select-value">{selected?.label || 'Sélectionner...'}</span>
+        <svg className={`sd-select-chevron ${isOpen ? 'sd-select-chevron--open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+      
+      {isOpen && (
+        <div className="sd-select-menu">
+          {options.map(opt => (
+            <div 
+              key={opt.value}
+              className={`sd-select-option ${value === opt.value ? 'sd-select-option--active' : ''}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              <span className="sd-option-label">{opt.label}</span>
+              {value === opt.value && (
+                <svg className="sd-option-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StatistiquesDelaisPage() {
   const [selectedStatut, setSelectedStatut] = useState('EN_EXPERTISE');
   const [periode, setPeriode] = useState('tout');
@@ -86,15 +140,11 @@ export default function StatistiquesDelaisPage() {
                 <div className="sd-filter-icon"><IconFilter /></div>
                 <div className="sd-filter-field">
                   <label htmlFor="sd-statut">Étape du workflow</label>
-                  <select
-                    id="sd-statut"
+                  <CustomSelect
                     value={selectedStatut}
-                    onChange={(e) => setSelectedStatut(e.target.value)}
-                  >
-                    {STATUT_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                    onChange={setSelectedStatut}
+                    options={STATUT_OPTIONS}
+                  />
                 </div>
               </div>
 
@@ -104,15 +154,11 @@ export default function StatistiquesDelaisPage() {
                 <div className="sd-filter-icon sd-filter-icon--blue"><IconCalendar /></div>
                 <div className="sd-filter-field">
                   <label htmlFor="sd-periode">Période</label>
-                  <select
-                    id="sd-periode"
+                  <CustomSelect
                     value={periode}
-                    onChange={(e) => setPeriode(e.target.value)}
-                  >
-                    {PERIODE_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                    onChange={setPeriode}
+                    options={PERIODE_OPTIONS}
+                  />
                 </div>
               </div>
 
@@ -122,32 +168,18 @@ export default function StatistiquesDelaisPage() {
                 <div className="sd-filter-icon sd-filter-icon--purple"><IconSort /></div>
                 <div className="sd-filter-field">
                   <label htmlFor="sd-sort">Tri</label>
-                  <select
-                    id="sd-sort"
+                  <CustomSelect
                     value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value)}
-                  >
-                    <option value="desc">Plus long → court</option>
-                    <option value="asc">Plus court → long</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="sd-filter-divider" />
-
-              <div className="sd-filter-item sd-filter-item--grow">
-                <div className="sd-filter-icon sd-filter-icon--gray"><IconSearch /></div>
-                <div className="sd-filter-field sd-filter-field--grow">
-                  <label htmlFor="sd-search">Rechercher un dossier</label>
-                  <input
-                    id="sd-search"
-                    type="text"
-                    placeholder="Ex: SIN-2026-001"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={setSortOrder}
+                    options={[
+                      { value: 'desc', label: 'Plus long → court' },
+                      { value: 'asc', label: 'Plus court → long' }
+                    ]}
                   />
                 </div>
               </div>
+
+
             </div>
           </div>
 

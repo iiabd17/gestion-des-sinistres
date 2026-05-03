@@ -5,6 +5,10 @@ import { AuthContext } from '../../../context/AuthContext'
 import api from '../../../api'
 import Sidebar from '../../../componenets/Sidebar/Sidebar'
 import AssuranceDashboardStats from './AssuranceDashboardStats'
+import IngenieurDashboardStats from './IngenieurDashboardStats'
+import LegalDashboardStats from './LegalDashboardStats'
+import HseDashboardStats from './HseDashboardStats'
+import EquipeTerrainDashboardStats from './EquipeTerrainDashboardStats'
 import './Dashboard.css'
 
 /* ── Statut badge mapping ─────────────────────────────── */
@@ -65,6 +69,20 @@ export default function Dashboard() {
 
   const userName = user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : 'Utilisateur'
 
+  /* ── Widget de KPI selon le rôle ── */
+  const renderRoleStats = () => {
+    const role = user?.role
+    switch (role) {
+      case 'ASSURANCE': return <AssuranceDashboardStats />
+      case 'INGENIEUR': return <IngenieurDashboardStats />
+      case 'LEGAL':     return <LegalDashboardStats />
+      case 'HSE':       return <HseDashboardStats />
+      case 'EQUIPE_TERRAIN': return <EquipeTerrainDashboardStats />
+      case 'ADMIN':     return <AssuranceDashboardStats />
+      default:          return null
+    }
+  }
+
   return (
     <div className="db-layout">
 
@@ -103,10 +121,8 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Section spécifique Assurance */}
-          {user?.role === 'ASSURANCE' && <AssuranceDashboardStats />}
-
-
+          {/* KPIs spécifiques au rôle */}
+          {renderRoleStats()}
 
           {/* bottom split: table + info */}
           <div className="db-bottom">

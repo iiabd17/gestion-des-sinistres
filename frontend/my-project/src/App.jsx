@@ -46,15 +46,15 @@ function App() {
             <Route path="/declarations/completer/:id" element={<DossierCompleterDetailPage />} />
           </Route>
 
-          {/* Routes Assurance & Légal & HSE (Validation/Gestion) */}
-          <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'LEGAL', 'HSE', 'ADMIN']} />}>
+          {/* Routes Validation/Gestion (Assurance, Légal, HSE, Ingénieur) */}
+          <Route element={<ProtectedRoute allowedRoles={['ASSURANCE', 'LEGAL', 'HSE', 'INGENIEUR', 'ADMIN']} />}>
             <Route path="/declarations/valider/:id" element={<DossierValidationPage />} />
             <Route path="/gestion" element={<GestionDossiersPage />} />
             <Route path="/gestion/:id" element={<DossierGestionDetailPage />} />
           </Route>
 
           {/* Routes Archives */}
-          <Route element={<ProtectedRoute allowedRoles={['LEGAL', 'ASSURANCE', 'ADMIN', 'HSE']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['LEGAL', 'ASSURANCE', 'ADMIN', 'HSE', 'INGENIEUR']} />}>
             <Route path="/archives" element={<ArchivesPage />} />
           </Route>
 

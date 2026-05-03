@@ -11,6 +11,7 @@ export default function Archives() {
   const [loading, setLoading] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -54,8 +55,18 @@ export default function Archives() {
           <nav className="arc-breadcrumbs">Archives</nav>
 
           {/* Header */}
-          <header className="arc-header">
+          <header className="arc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h1>Archives des Dossiers</h1>
+            <div className="arc-search" style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '280px' }}>
+              <IconSearch style={{ marginRight: '8px', color: '#a0aec0' }} />
+              <input 
+                type="text" 
+                placeholder="Rechercher par ID..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ border: 'none', outline: 'none', width: '100%', fontSize: '14px', color: '#2d3748' }}
+              />
+            </div>
           </header>
 
           {/* Stats Grid */}
@@ -104,7 +115,9 @@ export default function Archives() {
                   </tr>
                 </thead>
                 <tbody>
-                  {archives.map(d => (
+                  {archives
+                    .filter(d => searchTerm ? d.idSinistre?.toLowerCase().includes(searchTerm.toLowerCase()) : true)
+                    .map(d => (
                     <tr key={d.idSinistre}>
                       <td className="arc-id">{d.idSinistre}</td>
                       <td className="arc-date">
@@ -182,3 +195,4 @@ function IconPin() { return <svg viewBox="0 0 24 24" fill="none" stroke="current
 function IconEye() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:18}}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> }
 function IconChevronLeft() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16}}><polyline points="15 18 9 12 15 6"/></svg> }
 function IconChevronRight() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16}}><polyline points="9 18 15 12 9 6"/></svg> }
+function IconSearch() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> }

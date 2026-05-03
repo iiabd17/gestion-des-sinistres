@@ -382,10 +382,20 @@ class SinistreListCreateView(APIView):
     def get(self, request):
         user = request.user
 
-        # Équipe Terrain : ne voit que ses propres sinistres
+        # ── Filtrage strict par rôle ──
         if hasattr(user, 'equipeterrain'):
+            # Équipe Terrain : uniquement ses propres déclarations
             sinistres = Sinistre.objects.filter(createur=user)
+        elif hasattr(user, 'legal'):
+            # Légal : uniquement les dossiers de nature VOL
+            sinistres = Sinistre.objects.filter(nature='VOL')
+        elif hasattr(user, 'hse'):
+            # HSE : uniquement les natures liées à la sécurité
+            sinistres = Sinistre.objects.filter(
+                nature__in=['INCENDIE', 'CATASTROPHE_NATUREL', 'INTEMPERIE', 'VIOLENCE_POLITIQUE']
+            )
         else:
+            # Assurance, Ingénieur, Admin : accès global
             sinistres = Sinistre.objects.all()
 
         # Filtres optionnels via query params
@@ -461,6 +471,27 @@ class SinistreDetailView(APIView):
 
     def get(self, request, pk):
         sinistre = get_object_or_404(Sinistre, pk=pk)
+        user = request.user
+
+        # ── Vérification de visibilité par rôle ──
+        HSE_NATURES = ['INCENDIE', 'CATASTROPHE_NATUREL', 'INTEMPERIE', 'VIOLENCE_POLITIQUE']
+
+        if hasattr(user, 'equipeterrain') and sinistre.createur != user:
+            return Response(
+                {'error': "Vous n'avez accès qu'à vos propres déclarations."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if hasattr(user, 'legal') and sinistre.nature != 'VOL':
+            return Response(
+                {'error': "Le service Légal n'a accès qu'aux dossiers de nature VOL."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if hasattr(user, 'hse') and sinistre.nature not in HSE_NATURES:
+            return Response(
+                {'error': "Le service HSE n'a accès qu'aux dossiers liés à la sécurité."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         return Response(SinistreDetailSerializer(sinistre).data)
 
     @transaction.atomic

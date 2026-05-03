@@ -375,23 +375,32 @@
 }
 
 .dcl-photo-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-  background: #fff;
+  background: #f8fafc;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.dcl-photo-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .dcl-photo-btn:hover {
-  background: #f1f5f9;
+  background: #fff0f0;
   color: #E2000F;
-  border-color: #E2000F;
+  border-color: #fecaca;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(226, 0, 15, 0.12);
 }
 
 .dcl-export-btn {
