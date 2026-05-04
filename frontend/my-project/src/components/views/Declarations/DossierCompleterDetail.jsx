@@ -90,10 +90,14 @@ export default function DossierCompleterDetail() {
 
   const handleEquipSelect = (option) => {
     if (option) {
-      setNewEquip(prev => ({ ...prev, nomMarque: option.value }))
+      setNewEquip(prev => ({
+        ...prev,
+        nomMarque: option.value,
+        valeurComptable: option.avgValue || 0,
+      }))
       setRefAvgValue(option.avgValue)
     } else {
-      setNewEquip(prev => ({ ...prev, nomMarque: '' }))
+      setNewEquip(prev => ({ ...prev, nomMarque: '', valeurComptable: 0 }))
       setRefAvgValue(null)
     }
   }
