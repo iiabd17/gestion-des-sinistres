@@ -319,6 +319,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['nom']    = user.nom
         token['prenom'] = user.prenom
 
+        # Ajouter le sous-rôle assurance (AGENT / DIRECTRICE) si applicable
+        if hasattr(user, 'assurance'):
+            token['role_assurance'] = user.assurance.role
+
         return token
 
     def validate(self, attrs):

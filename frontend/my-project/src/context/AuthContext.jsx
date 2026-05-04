@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
             role: decoded.role,
             nom: decoded.nom,
             prenom: decoded.prenom,
+            role_assurance: decoded.role_assurance || null,
           });
         }
       } catch (error) {
@@ -67,6 +68,7 @@ export const AuthProvider = ({ children }) => {
       role: decoded.role,
       nom: decoded.nom,
       prenom: decoded.prenom,
+      role_assurance: decoded.role_assurance || null,
     });
   };
 

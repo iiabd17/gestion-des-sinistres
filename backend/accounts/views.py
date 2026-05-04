@@ -133,6 +133,12 @@ class ListUsersView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        # Ingénieur can only see Equipe Terrain users
+        if hasattr(request.user, 'ingenieur'):
+            from accounts.models import EquipeTerrain
+            et_users = EquipeTerrain.objects.all().order_by('-id')
+            serializer = UtilisateurSerializer(et_users, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         users = Utilisateur.objects.all().order_by('-id')
         serializer = UtilisateurSerializer(users, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -167,6 +173,14 @@ class CreateUserView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def post(self, request):
+        # Ingénieur ne peut créer que des comptes EQUIPE_TERRAIN
+        if hasattr(request.user, 'ingenieur'):
+            if request.data.get('role') != 'EQUIPE_TERRAIN':
+                return Response(
+                    {'error': "Les ingénieurs ne peuvent créer que des comptes Équipe Terrain."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         serializer = CreateUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -234,6 +248,53 @@ class DeleteUserView(APIView):
         user.delete()
         return Response({
             'message': f"Le compte de {nom_complet} a été supprimé.",
+        }, status=status.HTTP_200_OK)
+
+
+class ChangeUserPasswordView(APIView):
+    """
+    PATCH /api/accounts/users/<id>/change-password/
+
+    Permet aux gestionnaires de comptes de réinitialiser le mot de passe d'un utilisateur.
+    Accessible par : Admin, Directrice Assurance, Ingénieur (limité à Equipe Terrain).
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def patch(self, request, user_id):
+        user = get_object_or_404(Utilisateur, pk=user_id)
+        new_password = request.data.get('password', '')
+
+        if not new_password:
+            return Response(
+                {'error': "Le nouveau mot de passe est obligatoire."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validation du mot de passe
+        if len(new_password) < 8 or len(new_password) > 12:
+            return Response(
+                {'error': "Le mot de passe doit contenir entre 8 et 12 caractères."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not any(c.isdigit() for c in new_password):
+            return Response(
+                {'error': "Le mot de passe doit contenir au moins un chiffre."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Ingénieur ne peut changer que les mots de passe d'Equipe Terrain
+        if hasattr(request.user, 'ingenieur'):
+            if not hasattr(user, 'equipeterrain'):
+                return Response(
+                    {'error': "Les ingénieurs ne peuvent modifier que les mots de passe des Équipe Terrain."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({
+            'message': f"Mot de passe modifié avec succès pour {user.nom} {user.prenom}.",
         }, status=status.HTTP_200_OK)
 
 

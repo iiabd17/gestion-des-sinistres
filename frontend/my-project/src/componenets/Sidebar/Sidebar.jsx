@@ -55,11 +55,15 @@ export default function Sidebar() {
 
       {/* Bottom nav */}
       <div className="sb-nav-bottom">
-        <button className="sb-nav-item">
+        <button
+          className={`sb-nav-item ${pathname.startsWith('/support') ? 'sb-nav-item--active' : ''}`}
+          onClick={() => navigate('/support')}
+        >
           <IconSupport />
           <span>Support</span>
         </button>
-        {['ASSURANCE', 'ADMIN', 'INGENIEUR'].includes(role) && (
+        {/* Paramètres : ADMIN, INGENIEUR, ASSURANCE DIRECTRICE (pas AGENT) */}
+        {(role === 'ADMIN' || role === 'INGENIEUR' || (role === 'ASSURANCE' && user?.role_assurance === 'DIRECTRICE')) && (
           <button
             className={`sb-nav-item ${pathname.startsWith('/settings') ? 'sb-nav-item--active' : ''}`}
             onClick={() => navigate('/settings')}

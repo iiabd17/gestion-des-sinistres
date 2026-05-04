@@ -74,9 +74,20 @@ class EquipementSerializer(serializers.ModelSerializer):
             'dateInstallation', 'valeurComptable', 'quantiteImpactee',
             'sinistre', 'sousGarantie',
         ]
+        extra_kwargs = {
+            'sinistre': {'required': False, 'allow_null': True},
+            'idEquipement': {'required': False},
+        }
 
     def get_sousGarantie(self, obj):
         return obj.verifierGarantie()
+
+    def create(self, validated_data):
+        # Auto-generate idEquipement if not provided (catalog entries)
+        if not validated_data.get('idEquipement'):
+            import uuid
+            validated_data['idEquipement'] = f"EQ-{uuid.uuid4().hex[:8].upper()}"
+        return super().create(validated_data)
 
 
 # ═════════════════════════════════════════════

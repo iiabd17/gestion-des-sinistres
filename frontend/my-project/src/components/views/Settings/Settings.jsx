@@ -18,10 +18,12 @@ export default function Settings() {
   const navigate = useNavigate()
   const role = user?.role || ''
   const isAdmin = ['ASSURANCE', 'ADMIN'].includes(role)
+  const isIngenieur = role === 'INGENIEUR'
+  const canManageUsers = isAdmin || isIngenieur
   const canEquip = ['ASSURANCE', 'ADMIN', 'INGENIEUR'].includes(role)
 
-  // Default tab: ingénieur goes straight to equipment
-  const [activeTab, setActiveTab] = useState(isAdmin ? 'sites' : 'equipements')
+  // Default tab: ingénieur goes straight to comptes (they can create equipe terrain)
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'sites' : isIngenieur ? 'comptes' : 'equipements')
 
   // ── Sites ──
   const [sites, setSites] = useState([])
@@ -40,7 +42,7 @@ export default function Settings() {
   // ── Comptes ──
   const [users, setUsers] = useState([])
   const [loadingUsers, setLoadingUsers] = useState(true)
-  const [userForm, setUserForm] = useState({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role:'INGENIEUR', role_assurance:'AGENT', specialite:'', matriculeTechnique:'', departement:'', fonction:'', matricule:'', division:'', zoneIntervention:'' })
+  const [userForm, setUserForm] = useState({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role: isIngenieur ? 'EQUIPE_TERRAIN' : 'INGENIEUR', role_assurance:'AGENT', specialite:'', matriculeTechnique:'', departement:'', fonction:'', matricule:'', division:'', zoneIntervention:'' })
 
   // ── Équipements ──
   const [equipements, setEquipements] = useState([])
@@ -59,7 +61,7 @@ export default function Settings() {
 
   // Load users
   useEffect(() => {
-    if (activeTab !== 'comptes' || !isAdmin) return
+    if (activeTab !== 'comptes' || !canManageUsers) return
     setLoadingUsers(true)
     api.get('/accounts/users/')
       .then(r => setUsers(Array.isArray(r.data) ? r.data : []))
@@ -162,7 +164,7 @@ export default function Settings() {
     api.post('/accounts/users/create/', payload)
       .then(r => { 
         toast.success(r.data.message); 
-        setUserForm({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role:'INGENIEUR', role_assurance:'AGENT', specialite:'', matriculeTechnique:'', departement:'', fonction:'', matricule:'', division:'', zoneIntervention:'' }); 
+        setUserForm({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role: isIngenieur ? 'EQUIPE_TERRAIN' : 'INGENIEUR', role_assurance:'AGENT', specialite:'', matriculeTechnique:'', departement:'', fonction:'', matricule:'', division:'', zoneIntervention:'' }); 
         setUsers(u => [r.data.user, ...u]);
         setShowAddUserForm(false);
       })
@@ -173,6 +175,14 @@ export default function Settings() {
     api.patch(`/accounts/users/${id}/toggle-status/`)
       .then(r => { toast.success(r.data.message); setUsers(u => u.map(x => x.id === id ? { ...x, estActif: r.data.estActif } : x)) })
       .catch(err => toast.error(err.response?.data?.message || "Erreur"))
+  }
+
+  const handleChangePassword = (userId, userName) => {
+    const newPw = window.prompt(`Nouveau mot de passe pour ${userName}\n(8-12 caractères, au moins 1 chiffre)`)
+    if (!newPw) return
+    api.patch(`/accounts/users/${userId}/change-password/`, { password: newPw })
+      .then(r => toast.success(r.data.message))
+      .catch(err => toast.error(err.response?.data?.error || "Erreur"))
   }
 
   const handleUpdateFranchise = (nature, montant) => {
@@ -223,7 +233,7 @@ export default function Settings() {
           {/* Tabs */}
           <div className="st-tabs">
             {isAdmin && <button className={`st-tab ${activeTab==='sites'?'st-tab--active':''}`} onClick={()=>setActiveTab('sites')}><IconTower /> Sites</button>}
-            {isAdmin && <button className={`st-tab ${activeTab==='comptes'?'st-tab--active':''}`} onClick={()=>setActiveTab('comptes')}><IconUserPlus /> Comptes</button>}
+            {canManageUsers && <button className={`st-tab ${activeTab==='comptes'?'st-tab--active':''}`} onClick={()=>setActiveTab('comptes')}><IconUserPlus /> Comptes</button>}
             {isAdmin && <button className={`st-tab ${activeTab==='franchises'?'st-tab--active':''}`} onClick={()=>setActiveTab('franchises')}><IconShield /> Franchises</button>}
             {canEquip && <button className={`st-tab ${activeTab==='equipements'?'st-tab--active':''}`} onClick={()=>setActiveTab('equipements')}><IconCpu /> Équipements</button>}
           </div>
@@ -279,7 +289,7 @@ export default function Settings() {
           )}
 
           {/* ═══ TAB COMPTES ═══ */}
-          {activeTab==='comptes' && isAdmin && (
+          {activeTab==='comptes' && canManageUsers && (
             <section className="st-card">
               <div className="st-section-head" style={{ alignItems: 'flex-start' }}>
                 <div className="st-section-title"><h2>Gestion des Comptes</h2><p>{users.length} utilisateur(s) enregistrés</p></div>
@@ -302,11 +312,17 @@ export default function Settings() {
                       <label>MOT DE PASSE * <small style={{color:'#94a3b8'}}>(8–12 car., 1 chiffre min.)</small></label>
                       <input className="st-input" type="password" value={userForm.password} onChange={e=>uf('password',e.target.value)} required minLength={8} maxLength={12} />
                     </div>
-                    <div className="st-field"><label>RÔLE *</label>
-                      <select className="st-input" value={userForm.role} onChange={e=>uf('role',e.target.value)}>
-                        {ROLES.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}
-                      </select>
-                    </div>
+                    {isIngenieur ? (
+                      <div className="st-field"><label>RÔLE</label>
+                        <input className="st-input" value="Équipe Terrain" disabled style={{ background: '#f1f5f9', color: '#64748b' }} />
+                      </div>
+                    ) : (
+                      <div className="st-field"><label>RÔLE *</label>
+                        <select className="st-input" value={userForm.role} onChange={e=>uf('role',e.target.value)}>
+                          {ROLES.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}
+                        </select>
+                      </div>
+                    )}
                     {userForm.role==='ASSURANCE' && (
                       <div className="st-field"><label>SOUS-RÔLE ASSURANCE</label>
                         <select className="st-input" value={userForm.role_assurance} onChange={e=>uf('role_assurance',e.target.value)}>
@@ -354,6 +370,7 @@ export default function Settings() {
                           </span>
                         </td>
                         <td>
+                          <button className="st-toggle-btn" onClick={()=>handleChangePassword(u.id, `${u.nom} ${u.prenom}`)} title="Changer le mot de passe">🔑</button>
                           <button className="st-toggle-btn" onClick={()=>handleToggleUser(u.id)} title={u.estActif?'Désactiver':'Activer'}>{u.estActif?'⏸':'▶'}</button>
                         </td>
                       </tr>

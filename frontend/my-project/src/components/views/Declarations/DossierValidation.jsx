@@ -27,6 +27,8 @@ export default function DossierValidation() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [showMotifModal, setShowMotifModal] = useState(false)
+  const [motifText, setMotifText] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -55,12 +57,18 @@ export default function DossierValidation() {
 
   // Send back to compléter (OUVERT) and notify ingénieur
   const handleInfoManquante = useCallback(async () => {
+    if (!motifText.trim()) {
+      toast.error('Veuillez préciser les informations manquantes.')
+      return
+    }
     setSubmitting(true)
     try {
       await api.post(`/sinistres/${id}/retour-completion/`, {
-        motif: 'Informations manquantes — dossier renvoyé pour complétion.',
+        motif: motifText.trim(),
       })
       toast.success('Dossier renvoyé pour complétion. L\'ingénieur a été notifié.')
+      setShowMotifModal(false)
+      setMotifText('')
       navigate('/declarations', { state: { tab: 'completer' } })
     } catch (err) {
       if (err.response?.status === 403) {
@@ -71,7 +79,7 @@ export default function DossierValidation() {
     } finally {
       setSubmitting(false)
     }
-  }, [id, navigate])
+  }, [id, navigate, motifText])
 
   const exportPDF = async () => {
     try {
@@ -324,7 +332,7 @@ export default function DossierValidation() {
 
           {/* Bottom actions */}
           <div className="dv-actions">
-            <button className="dv-hold-btn" onClick={handleInfoManquante} disabled={submitting}>
+            <button className="dv-hold-btn" onClick={() => setShowMotifModal(true)} disabled={submitting}>
               Mettre en Attente (Infos Manquantes)
             </button>
             <button className="dv-pdf-btn" onClick={exportPDF}>
@@ -339,6 +347,30 @@ export default function DossierValidation() {
           </div>
         </main>
       </div>
+
+      {/* Modal Motif */}
+      {showMotifModal && (
+        <div className="dv-modal-overlay" onClick={() => setShowMotifModal(false)}>
+          <div className="dv-modal" onClick={e => e.stopPropagation()}>
+            <h3 className="dv-modal-title">Informations Manquantes</h3>
+            <p className="dv-modal-desc">Précisez les informations manquantes ou les corrections à apporter. Ce message sera envoyé à l'ingénieur.</p>
+            <textarea
+              className="dv-modal-textarea"
+              rows={5}
+              placeholder="Ex: Photos du site manquantes, montant estimé à vérifier, description incomplète..."
+              value={motifText}
+              onChange={e => setMotifText(e.target.value)}
+              autoFocus
+            />
+            <div className="dv-modal-actions">
+              <button className="dv-modal-cancel" onClick={() => { setShowMotifModal(false); setMotifText('') }}>Annuler</button>
+              <button className="dv-modal-confirm" onClick={handleInfoManquante} disabled={submitting || !motifText.trim()}>
+                {submitting ? 'Envoi...' : 'Envoyer à l\'ingénieur'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

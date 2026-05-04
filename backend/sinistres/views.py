@@ -44,6 +44,7 @@ from .serializers import (
 from accounts.permissions import (
     IsEquipeTerrain,
     IsIngenieur,
+    IsIngenieurOrAssurance,
     IsLegal,
     IsHse,
     IsAssurance,
@@ -584,7 +585,7 @@ class SinistreExpertiseView(APIView):
         "montantEstime": 150000.0
     }
     """
-    permission_classes = [permissions.IsAuthenticated, IsIngenieur]
+    permission_classes = [permissions.IsAuthenticated, IsIngenieurOrAssurance]
 
     @transaction.atomic
     def post(self, request, pk):
@@ -607,60 +608,23 @@ class SinistreExpertiseView(APIView):
         if 'montantEstime' in request.data:
             sinistre.montantEstime = request.data['montantEstime']
 
-        # LOGIQUE DE FRANCHISE
-        from .models import Franchise
-        
-        # VOL ou SABOTAGE -> ignore la franchise
-        if sinistre.nature in ['VOL', 'ACTE_DE_SABOTAGE']:
-            sinistre.statut = 'EN_EXPERTISE'
-            sinistre.save()
+        # Expertise complétée → toujours EN_EXPERTISE (la vérification franchise se fait lors de la validation assurance)
+        sinistre.statut = 'EN_EXPERTISE'
+        sinistre.save()
 
-            _log_changement_statut(
-                sinistre, ancien_statut, 'EN_EXPERTISE', request.user,
-                'Expertise technique complétée (Exception VOL/SABOTAGE).'
-            )
+        _log_changement_statut(
+            sinistre, ancien_statut, 'EN_EXPERTISE', request.user,
+            f'Expertise technique complétée. Montant estimé : {sinistre.montantEstime} DA.'
+        )
 
-            from accounts.models import Assurance
-            directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
-            lien = f"/gestion/{sinistre.idSinistre}"
-            _create_notification(directeurs_assurance, f"Expertise terminée pour le sinistre {sinistre.nature} {sinistre.idSinistre}.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
-            
-        else:
-            try:
-                franchise = Franchise.objects.get(nature=sinistre.nature)
-                franchise_amount = franchise.montant
-            except Franchise.DoesNotExist:
-                franchise_amount = 0.0
-
-            if sinistre.montantEstime < franchise_amount:
-                # Scénario A: Sous Franchise -> En attente de validation
-                sinistre.statut = 'ATTENTE_VALIDATION_FRANCHISE'
-                sinistre.save()
-
-                _log_changement_statut(
-                    sinistre, ancien_statut, 'ATTENTE_VALIDATION_FRANCHISE', request.user,
-                    f'Montant estimé ({sinistre.montantEstime} DA) inférieur à la franchise ({franchise_amount} DA). En attente de validation.'
-                )
-
-                # Notifier uniquement l'assurance
-                from accounts.models import Assurance
-                directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
-                lien = f"/gestion/{sinistre.idSinistre}"
-                _create_notification(directeurs_assurance, f"Le sinistre {sinistre.idSinistre} est sous la franchise et attend votre validation pour clôture.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
-            else:
-                # Scénario B: Montant >= Franchise -> Continue le workflow
-                sinistre.statut = 'EN_EXPERTISE'
-                sinistre.save()
-
-                _log_changement_statut(
-                    sinistre, ancien_statut, 'EN_EXPERTISE', request.user,
-                    f'Expertise technique complétée. Montant estimé ({sinistre.montantEstime} DA) dépasse la franchise.'
-                )
-
-                from accounts.models import Assurance
-                directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
-                lien = f"/gestion/{sinistre.idSinistre}"
-                _create_notification(directeurs_assurance, f"Expertise terminée pour {sinistre.idSinistre}. Le dossier est prêt pour la validation finale.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+        from accounts.models import Assurance
+        directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+        lien = f"/gestion/{sinistre.idSinistre}"
+        _create_notification(
+            directeurs_assurance,
+            f"Expertise terminée pour le sinistre {sinistre.idSinistre}. Le dossier est prêt pour votre validation.",
+            lien, expediteur=request.user, sinistre_id=sinistre.idSinistre
+        )
 
         return Response(SinistreDetailSerializer(sinistre).data)
 
@@ -738,6 +702,7 @@ class SinistreRetourCompletionView(APIView):
         motif = request.data.get('motif', 'Informations manquantes')
 
         sinistre.statut = 'OUVERT'
+        sinistre.motifRejet = motif
         sinistre.save()
 
         _log_changement_statut(
@@ -784,7 +749,7 @@ class SinistreValidationAssuranceView(APIView):
     def post(self, request, pk):
         sinistre = get_object_or_404(Sinistre, pk=pk)
 
-        if sinistre.statut != 'EN_EXPERTISE':
+        if sinistre.statut not in ('EN_EXPERTISE', 'ATTENTE_VALIDATION_FRANCHISE'):
             return Response(
                 {'error': f"Ce sinistre doit être en statut 'En Expertise' pour être validé. "
                           f"Statut actuel : {sinistre.get_statut_display()}."},
@@ -797,36 +762,59 @@ class SinistreValidationAssuranceView(APIView):
         if action == 'VALIDER':
             ancien_statut = sinistre.statut
 
-            # Routage conditionnel selon la nature (diagramme de séquence)
-            if sinistre.nature == 'VOL' or sinistre.nature == 'ACTE_DE_SABOTAGE':
-                sinistre.statut = 'EN_VALIDATION_LEGAL'
-                msg = 'Dossier validé. Transmis au service Légal pour PV de Police.'
-            elif sinistre.nature == 'INCENDIE':
-                sinistre.statut = 'EN_VALIDATION_HSE'
-                msg = 'Dossier validé. Transmis au service HSE pour rapport d\'expertise.'
+            # ── VÉRIFICATION FRANCHISE (s'applique après validation assurance) ──
+            from .models import Franchise
+            try:
+                franchise = Franchise.objects.get(nature=sinistre.nature)
+                franchise_amount = franchise.montant
+            except Franchise.DoesNotExist:
+                franchise_amount = 0.0
+
+            # VOL et SABOTAGE sont exemptés de la franchise
+            nature_exclue_franchise = sinistre.nature in ['VOL', 'ACTE_DE_SABOTAGE']
+
+            if not nature_exclue_franchise and franchise_amount > 0 and sinistre.montantEstime < franchise_amount:
+                # Montant sous la franchise → attente de clôture sous franchise
+                sinistre.statut = 'ATTENTE_VALIDATION_FRANCHISE'
+                sinistre.save()
+                _log_changement_statut(
+                    sinistre, ancien_statut, 'ATTENTE_VALIDATION_FRANCHISE', request.user,
+                    f'Montant estimé ({sinistre.montantEstime} DA) inférieur à la franchise ({franchise_amount} DA). En attente de validation clôture.'
+                )
+                lien = f"/gestion/{sinistre.idSinistre}"
+                _create_notification(
+                    [request.user],
+                    f"Le sinistre {sinistre.idSinistre} est sous la franchise ({franchise_amount} DA). En attente de clôture sous franchise.",
+                    lien, expediteur=request.user, sinistre_id=sinistre.idSinistre
+                )
             else:
-                sinistre.statut = 'VALIDE'
-                msg = 'Dossier validé en interne. Prêt pour transmission.'
+                # Montant >= franchise → routage normal selon la nature
+                if sinistre.nature == 'VOL' or sinistre.nature == 'ACTE_DE_SABOTAGE':
+                    sinistre.statut = 'EN_VALIDATION_LEGAL'
+                    msg = 'Dossier validé. Transmis au service Légal pour PV de Police.'
+                elif sinistre.nature == 'INCENDIE':
+                    sinistre.statut = 'EN_VALIDATION_HSE'
+                    msg = 'Dossier validé. Transmis au service HSE pour rapport d\'expertise.'
+                else:
+                    sinistre.statut = 'VALIDE'
+                    msg = 'Dossier validé en interne. Prêt pour transmission.'
 
-            sinistre.save()
-            _log_changement_statut(sinistre, ancien_statut, sinistre.statut, request.user, msg)
+                sinistre.save()
+                _log_changement_statut(sinistre, ancien_statut, sinistre.statut, request.user, msg)
 
-            if sinistre.statut == 'EN_VALIDATION_LEGAL':
-                from accounts.models import Legal
-                legals = Legal.objects.all()
                 lien = f"/gestion/{sinistre.idSinistre}"
-                _create_notification(legals, f"Dossier {sinistre.idSinistre} validé par l'assurance. En attente du PV de Police.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
-            elif sinistre.statut == 'EN_VALIDATION_HSE':
-                from accounts.models import Hse
-                hses = Hse.objects.all()
-                lien = f"/gestion/{sinistre.idSinistre}"
-                _create_notification(hses, f"Dossier {sinistre.idSinistre} validé par l'assurance. En attente du rapport d'expertise HSE.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
-            elif sinistre.statut == 'VALIDE':
-                # Direct validation (no Legal/HSE step needed)
-                from accounts.models import Assurance as AssuranceModel
-                directeurs = AssuranceModel.objects.filter(role=AssuranceModel.RoleAssurance.DIRECTRICE)
-                lien = f"/gestion/{sinistre.idSinistre}"
-                _create_notification(directeurs, f"Dossier {sinistre.idSinistre} validé en interne. Prêt pour transmission à l'assureur.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+                if sinistre.statut == 'EN_VALIDATION_LEGAL':
+                    from accounts.models import Legal
+                    legals = Legal.objects.all()
+                    _create_notification(legals, f"Dossier {sinistre.idSinistre} validé par l'assurance. En attente du PV de Police.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+                elif sinistre.statut == 'EN_VALIDATION_HSE':
+                    from accounts.models import Hse
+                    hses = Hse.objects.all()
+                    _create_notification(hses, f"Dossier {sinistre.idSinistre} validé par l'assurance. En attente du rapport d'expertise HSE.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+                elif sinistre.statut == 'VALIDE':
+                    from accounts.models import Assurance as AssuranceModel
+                    directeurs = AssuranceModel.objects.filter(role=AssuranceModel.RoleAssurance.DIRECTRICE)
+                    _create_notification(directeurs, f"Dossier {sinistre.idSinistre} validé en interne. Prêt pour transmission à l'assureur.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
         elif action == 'REJETER':
             ancien_statut = sinistre.statut
@@ -1121,7 +1109,7 @@ class SinistreArchiverView(APIView):
     def post(self, request, pk):
         sinistre = get_object_or_404(Sinistre, pk=pk)
 
-        if sinistre.statut != 'CLOTURE':
+        if sinistre.statut not in ('CLOTURE', 'CLOTURE_SOUS_FRANCHISE'):
             return Response(
                 {'error': f"Seuls les sinistres clôturés peuvent être archivés. "
                           f"Statut actuel : {sinistre.get_statut_display()}."},
@@ -1148,26 +1136,39 @@ class EquipementListCreateView(APIView):
     """
     GET  /api/equipements/                       → Liste tous les équipements
     GET  /api/sinistres/<pk>/equipements/         → Équipements d'un sinistre
-    POST /api/equipements/                        → Ajouter un équipement (Ingénieur)
+    POST /api/equipements/                        → Ajouter un équipement au catalogue (Ingénieur/Assurance)
+    POST /api/sinistres/<pk>/equipements/         → Ajouter un équipement à un sinistre (tout utilisateur authentifié actif)
     """
     def get_permissions(self):
         if self.request.method == 'POST':
+            # Adding equipment linked to a sinistre → any authenticated active user
+            # Adding to the catalog (no sinistre) → Ingénieur or Assurance only
+            sinistre_pk = self.kwargs.get('sinistre_pk') or self.request.data.get('sinistre')
+            if sinistre_pk:
+                return [permissions.IsAuthenticated(), IsAnyAuthenticated()]
             return [permissions.IsAuthenticated(), IsIngenieurOrAssurance()]
         return [permissions.IsAuthenticated()]
 
     def get(self, request, sinistre_pk=None):
         if sinistre_pk:
+            # Nested route: equipment linked to a specific sinistre
             get_object_or_404(Sinistre, pk=sinistre_pk)
             equipements = Equipement.objects.filter(sinistre_id=sinistre_pk)
         else:
-            equipements = Equipement.objects.all()
+            # Global catalog: only standalone entries (not linked to any sinistre)
+            equipements = Equipement.objects.filter(sinistre__isnull=True)
         return Response(EquipementSerializer(equipements, many=True).data)
 
     @transaction.atomic
     def post(self, request, sinistre_pk=None):
+        import uuid
         data = request.data.copy()
         if sinistre_pk:
             data['sinistre'] = sinistre_pk
+
+        # Auto-generate idEquipement if not provided
+        if not data.get('idEquipement'):
+            data['idEquipement'] = f"EQ-{uuid.uuid4().hex[:8].upper()}"
 
         serializer = EquipementSerializer(data=data)
         if serializer.is_valid():

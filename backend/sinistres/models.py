@@ -259,7 +259,9 @@ class Equipement(models.Model):
     sinistre = models.ForeignKey(
         Sinistre,
         on_delete=models.CASCADE,
-        related_name='equipements'
+        related_name='equipements',
+        null=True,
+        blank=True
     )
 
     def mettreAJourValeur(self, nouvelleValeur: float):

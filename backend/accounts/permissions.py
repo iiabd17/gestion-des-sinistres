@@ -99,6 +99,23 @@ class IsHse(BasePermission):
         return _is_admin(request.user) or hasattr(request.user, 'hse')
 
 
+class IsIngenieurOrAssurance(BasePermission):
+    """
+    Ingénieur OU Assurance — ou Admin.
+    Utilisé pour les actions partagées (ex: complétion d'expertise).
+    """
+    message = "Accès réservé aux ingénieurs ou au service assurance."
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if not getattr(request.user, 'estActif', False):
+            return False
+        return (_is_admin(request.user)
+                or hasattr(request.user, 'ingenieur')
+                or hasattr(request.user, 'assurance'))
+
+
 class IsAssurance(BasePermission):
     """
     Direction de l'Assurance (Insurance Department) — ou Admin.
@@ -125,13 +142,15 @@ class IsAssurance(BasePermission):
 
 class IsAdmin(BasePermission):
     """
-    Administrateur Système OU Directrice Assurance.
+    Administrateur Système OU Directrice Assurance OU Ingénieur (accès limité).
 
     Responsabilités :
     - Gestion des comptes utilisateurs (CRUD, activation/désactivation).
     - Maintenance des tables de référence (Régions, Types d'équipements).
+    Note: L'Ingénieur a un accès limité (création Équipe Terrain uniquement),
+    la restriction se fait au niveau des vues.
     """
-    message = "Accès réservé aux administrateurs ou à la Directrice Assurance."
+    message = "Accès réservé aux administrateurs, à la Directrice Assurance ou aux Ingénieurs."
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -143,6 +162,9 @@ class IsAdmin(BasePermission):
             return True
         # Directrice Assurance
         if hasattr(request.user, 'assurance'):
+            return True
+        # Ingénieur (accès limité, restrictions dans les vues)
+        if hasattr(request.user, 'ingenieur'):
             return True
         return False
 

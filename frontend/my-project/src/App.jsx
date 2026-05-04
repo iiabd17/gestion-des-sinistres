@@ -19,6 +19,7 @@ import SettingsPage from './Pages/Settings/SettingsPage';
 import ProfilePage from './Pages/Profile/ProfilePage';
 import NotificationsPage from './Pages/Notifications/NotificationsPage';
 import StatistiquesDelaisPage from './Pages/Statistiques/StatistiquesDelaisPage';
+import SupportPage from './Pages/Support/SupportPage';
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/support" element={<SupportPage />} />
             </Route>
 
             {/* Routes Équipe Terrain & Assurance */}

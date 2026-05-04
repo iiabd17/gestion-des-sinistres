@@ -10,14 +10,14 @@ import './DossierGestionDetail.css'
 import ClaimTimeline from '../../ClaimTimeline/ClaimTimeline'
 
 const NATURE_STYLES = {
-  'INCENDIE':            { bg: '#fef9c3', color: '#a16207' },
-  'VOL':                 { bg: '#ede9fe', color: '#7c3aed' },
-  'ACTE_DE_SABOTAGE':    { bg: '#ede9fe', color: '#7c3aed' },
-  'FIBRE_OPTIQUE':       { bg: '#dbeafe', color: '#1d4ed8' },
-  'INTEMPERIE':          { bg: '#dbeafe', color: '#1d4ed8' },
+  'INCENDIE': { bg: '#fef9c3', color: '#a16207' },
+  'VOL': { bg: '#ede9fe', color: '#7c3aed' },
+  'ACTE_DE_SABOTAGE': { bg: '#ede9fe', color: '#7c3aed' },
+  'FIBRE_OPTIQUE': { bg: '#dbeafe', color: '#1d4ed8' },
+  'INTEMPERIE': { bg: '#dbeafe', color: '#1d4ed8' },
   'CATASTROPHE_NATUREL': { bg: '#fee2e2', color: '#b91c1c' },
-  'VIOLENCE_POLITIQUE':  { bg: '#fce7f3', color: '#be185d' },
-  'RC':                  { bg: '#d1fae5', color: '#065f46' },
+  'VIOLENCE_POLITIQUE': { bg: '#fce7f3', color: '#be185d' },
+  'RC': { bg: '#d1fae5', color: '#065f46' },
 }
 
 export default function DossierGestionDetail() {
@@ -35,7 +35,7 @@ export default function DossierGestionDetail() {
   const [numeroPV, setNumeroPV] = useState('')
 
   useEffect(() => {
-    api.get('/constants/').then(res => setStatuts(res.data.statuts || [])).catch(() => {})
+    api.get('/constants/').then(res => setStatuts(res.data.statuts || [])).catch(() => { })
     api.get(`/sinistres/${id}/`)
       .then(res => {
         setData(res.data)
@@ -51,11 +51,24 @@ export default function DossierGestionDetail() {
     const formData = new FormData()
     formData.append('fichier', file)
     formData.append('titreDoc', file.name)
-    formData.append('typePiece', 'AUTRE')
+    formData.append('typePiece', user?.role === 'HSE' ? 'RAPPORT_HSE' : 'AUTRE')
     try {
       const res = await api.post(`/sinistres/${id}/pieces/`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
       toast.success('Document ajouté')
       setData(prev => ({ ...prev, piecesJointes: [...(prev.piecesJointes || []), res.data] }))
+
+      // HSE: after uploading rapport, auto-validate if dossier is EN_VALIDATION_HSE
+      if (user?.role === 'HSE' && data.statut === 'EN_VALIDATION_HSE') {
+        try {
+          const valRes = await api.post(`/sinistres/${id}/validation-hse/`, {
+            observationsHSE: `Rapport HSE ajouté : ${file.name}`,
+          })
+          setData(valRes.data)
+          toast.success('Dossier validé par HSE')
+        } catch (err) {
+          toast.error(err.response?.data?.error || 'Erreur lors de la validation HSE')
+        }
+      }
     } catch { toast.error("Erreur lors de l'ajout") }
   }
 
@@ -74,6 +87,19 @@ export default function DossierGestionDetail() {
       await api.patch(`/sinistres/${id}/`, { numeroPV })
       setData(prev => ({ ...prev, numeroPV }))
       toast.success('Numéro du PV sauvegardé')
+
+      // Legal: after saving PV, auto-validate if dossier is EN_VALIDATION_LEGAL
+      if (user?.role === 'LEGAL' && data.statut === 'EN_VALIDATION_LEGAL') {
+        try {
+          const valRes = await api.post(`/sinistres/${id}/validation-legal/`, {
+            numeroPV,
+          })
+          setData(valRes.data)
+          toast.success('Dossier validé par le service Légal')
+        } catch (err) {
+          toast.error(err.response?.data?.error || 'Erreur lors de la validation légale')
+        }
+      }
     } catch { toast.error('Erreur lors de la sauvegarde du PV') }
   }
 
@@ -84,6 +110,17 @@ export default function DossierGestionDetail() {
       toast.success('Clôture validée avec succès')
     } catch (error) {
       toast.error('Erreur lors de la validation de la clôture')
+    }
+  }
+
+  const handleArchiver = async () => {
+    if (!window.confirm('Archiver définitivement ce dossier ?')) return
+    try {
+      const res = await api.post(`/sinistres/${id}/archiver/`)
+      setData(res.data)
+      toast.success('Dossier archivé avec succès')
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Erreur lors de l'archivage")
     }
   }
 
@@ -118,7 +155,7 @@ export default function DossierGestionDetail() {
           })
           if (y + 90 > 280) { pdf.addPage(); y = 20 }
           pdf.addImage(imgData, 'JPEG', 20, y, 170, 80, undefined, 'FAST'); y += 90
-        } catch {}
+        } catch { }
       }
       pdf.save(`Dossier_${id}.pdf`)
       toast.success('PDF téléchargé')
@@ -182,6 +219,15 @@ export default function DossierGestionDetail() {
                     Valider Clôture
                   </button>
                 )}
+                {isAdminOrAssurance && (
+                  <button
+                    className="dgd-btn-secondary"
+                    style={{ borderColor: '#6366f1', color: '#6366f1' }}
+                    onClick={handleArchiver}
+                  >
+                    <IconArchive /> Archiver
+                  </button>
+                )}
                 {user?.role !== 'EQUIPE_TERRAIN' && (
                   <button className="dgd-btn-secondary" onClick={() => setIsEditing(!isEditing)}>
                     <IconEdit /> {isEditing ? 'Terminer' : 'Modifier'}
@@ -224,20 +270,27 @@ export default function DossierGestionDetail() {
                     <span className="dv-info-label">DESCRIPTION DU SITE</span>
                     <p className="dv-info-desc">{data.descriptionDetailliee || 'Aucune description fournie.'}</p>
                   </div>
+                  {data.nature === 'FIBRE_OPTIQUE' && (
+                    <div className="dv-info-field">
+                      <span className="dv-info-label">HEURE DE RÉPARATION (FIBRE OPTIQUE)</span>
+                      <p className="dv-info-val">{data.heureSurvenance ? data.heureSurvenance.substring(0, 5) : 'N/A'}</p>
+                    </div>
+                  )}
                   <div className="dv-info-field">
                     <span className="dv-info-label">COORDONNÉES GPS</span>
                     <div className="dv-gps-val"><IconPin />{gpsText}</div>
                   </div>
+
                 </div>
                 <div className="dv-site-photo">
                   <div className="dv-photo-bg" /><div className="dv-photo-overlay" />
                   <svg className="dv-pylon-icon" viewBox="0 0 60 100" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" aria-hidden="true">
-                    <line x1="30" y1="5" x2="30" y2="95"/><line x1="30" y1="20" x2="10" y2="50"/><line x1="30" y1="20" x2="50" y2="50"/>
-                    <line x1="30" y1="35" x2="15" y2="55"/><line x1="30" y1="35" x2="45" y2="55"/>
-                    <line x1="10" y1="50" x2="50" y2="50"/><line x1="15" y1="55" x2="45" y2="55"/>
-                    <line x1="10" y1="50" x2="10" y2="95"/><line x1="50" y1="50" x2="50" y2="95"/>
-                    <line x1="10" y1="95" x2="50" y2="95"/><line x1="5" y1="5" x2="55" y2="5"/>
-                    <circle cx="30" cy="5" r="3" fill="#E2000F" stroke="none"/>
+                    <line x1="30" y1="5" x2="30" y2="95" /><line x1="30" y1="20" x2="10" y2="50" /><line x1="30" y1="20" x2="50" y2="50" />
+                    <line x1="30" y1="35" x2="15" y2="55" /><line x1="30" y1="35" x2="45" y2="55" />
+                    <line x1="10" y1="50" x2="50" y2="50" /><line x1="15" y1="55" x2="45" y2="55" />
+                    <line x1="10" y1="50" x2="10" y2="95" /><line x1="50" y1="50" x2="50" y2="95" />
+                    <line x1="10" y1="95" x2="50" y2="95" /><line x1="5" y1="5" x2="55" y2="5" />
+                    <circle cx="30" cy="5" r="3" fill="#E2000F" stroke="none" />
                   </svg>
                 </div>
               </section>
@@ -257,9 +310,9 @@ export default function DossierGestionDetail() {
                   <div style={{ display: 'flex', alignItems: 'center', background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '8px', padding: '12px 16px', marginTop: '12px' }}>
                     <div style={{ color: '#9ca3af', marginRight: '12px', display: 'flex' }}><IconGavel /></div>
                     {isEditing ? (
-                      <input 
-                        type="text" 
-                        value={numeroPV} 
+                      <input
+                        type="text"
+                        value={numeroPV}
                         onChange={(e) => setNumeroPV(e.target.value)}
                         onBlur={handleSavePV}
                         placeholder="N° PV-2023-000"
@@ -295,11 +348,14 @@ export default function DossierGestionDetail() {
                 </section>
               )}
 
-              {/* Motif Rejet */}
+              {/* Commentaire Assurance */}
               {data.motifRejet && (
-                <section className="dv-card dgd-rejet-card">
-                  <h2 className="dv-card-title dgd-rejet-title">Motif de Rejet</h2>
-                  <p className="dv-info-desc dgd-rejet-text">{data.motifRejet}</p>
+                <section className="dv-card" style={{ border: '1.5px solid #fde68a', background: '#fffbeb' }}>
+                  <div className="dv-card-title-row">
+                    <span style={{ fontSize: 18 }}>⚠️</span>
+                    <h2 className="dv-card-title" style={{ color: '#92400e' }}>Commentaire de l'Assurance</h2>
+                  </div>
+                  <p style={{ fontSize: 13.5, color: '#78350f', lineHeight: 1.6, margin: 0 }}>{data.motifRejet}</p>
                 </section>
               )}
 
@@ -320,8 +376,8 @@ export default function DossierGestionDetail() {
                     ))}
                   </div>
                   {data.historiqueStatuts.length > 2 && (
-                    <button 
-                      className="dgd-btn-secondary" 
+                    <button
+                      className="dgd-btn-secondary"
                       style={{ marginTop: '10px', width: '100%', justifyContent: 'center' }}
                       onClick={() => setShowFullHistory(!showFullHistory)}
                     >
@@ -385,8 +441,8 @@ export default function DossierGestionDetail() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Franchise applicable</span>
                   <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: '600' }}>
-                    {typeof data.franchise_info === 'number' && data.franchise_info > 0 
-                      ? `${data.franchise_info.toLocaleString('fr-FR')} DA` 
+                    {typeof data.franchise_info === 'number' && data.franchise_info > 0
+                      ? `${data.franchise_info.toLocaleString('fr-FR')} DA`
                       : data.franchise_info === 0 ? 'Aucune (0 DA)' : data.franchise_info}
                   </span>
                 </div>
@@ -445,13 +501,14 @@ function InfoField({ label, value }) {
   )
 }
 
-function IconBell() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> }
-function IconUser() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
-function IconUserCard() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
-function IconDocument() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> }
-function IconPin() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> }
-function IconEdit() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> }
-function IconDownload() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> }
-function IconFolder() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2z"/></svg> }
-function IconFile() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> }
-function IconGavel() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16"><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><path d="m21 11-8-8"/></svg> }
+function IconBell() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg> }
+function IconUser() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg> }
+function IconUserCard() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg> }
+function IconDocument() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg> }
+function IconPin() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg> }
+function IconEdit() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg> }
+function IconDownload() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> }
+function IconFolder() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2z" /></svg> }
+function IconFile() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg> }
+function IconGavel() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16"><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10" /><path d="m16 16 6-6" /><path d="m8 8 6-6" /><path d="m9 7 8 8" /><path d="m21 11-8-8" /></svg> }
+function IconArchive() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> }

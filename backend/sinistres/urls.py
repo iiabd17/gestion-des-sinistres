@@ -105,7 +105,7 @@ urlpatterns = [
 
 
     # Validation Franchise (Assurance)
-    path('<str:pk>/validation-franchise/', views.SinistreValidationFranchiseView.as_view(), name='sinistre-validation-franchise'),
+    path('sinistres/<str:pk>/validation-franchise/', views.SinistreValidationFranchiseView.as_view(), name='sinistre-validation-franchise'),
 
     # ── Franchises ──
     path('franchises/',

@@ -223,6 +223,17 @@ export default function DossierCompleterDetail() {
             </div>
           </div>
 
+          {/* Commentaire assurance (full width, above body) */}
+          {data.motifRejet && (
+            <section className="dv-card" style={{ border: '1.5px solid #fde68a', background: '#fffbeb' }}>
+              <div className="dv-card-title-row">
+                <span style={{ fontSize: 18 }}>⚠️</span>
+                <h2 className="dv-card-title" style={{ color: '#92400e' }}>Commentaire de l'Assurance</h2>
+              </div>
+              <p style={{ fontSize: 13.5, color: '#78350f', lineHeight: 1.6, margin: 0 }}>{data.motifRejet}</p>
+            </section>
+          )}
+
           {/* ── Two-column body ── */}
           <div className="dv-body">
 

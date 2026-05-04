@@ -23,4 +23,5 @@ urlpatterns = [
     path('users/',                              views.ListUsersView.as_view(),        name='user-list'),
     path('users/create/',                       views.CreateUserView.as_view(),        name='user-create'),
     path('users/<int:user_id>/toggle-status/',  views.ToggleUserStatusView.as_view(),  name='user-toggle-status'),
+    path('users/<int:user_id>/change-password/', views.ChangeUserPasswordView.as_view(), name='user-change-password'),
 ]
