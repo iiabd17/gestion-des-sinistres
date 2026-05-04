@@ -109,7 +109,7 @@ export default function Dashboard() {
             <section className="db-table-section">
               <div className="db-section-header">
                 <h2 className="db-section-title">Sinistres Récents</h2>
-                <Link to="/gestion" className="db-voir-tout">Voir toute l'activité →</Link>
+                <Link to={['EQUIPE_TERRAIN', 'INGENIEUR'].includes(user?.role) ? '/declarations' : '/gestion'} className="db-voir-tout">Voir toute l'activité →</Link>
               </div>
 
               {loadingSinistres ? (

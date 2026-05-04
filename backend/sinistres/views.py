@@ -23,7 +23,7 @@ from rest_framework import status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, models
 from django.db.models import Q
 
 from .models import (
@@ -436,13 +436,29 @@ class SinistreListCreateView(APIView):
             # --- Notifications ---
             lien = f"/declarations/completer/{sinistre.idSinistre}"
             
-            # 1. Informer le Directeur Assurance
+            # CRITICAL ZONE ALERT: 3 claims in the current month
+            from datetime import date
+            current_month = date.today().month
+            current_year = date.today().year
+            claims_this_month = Sinistre.objects.filter(
+                site=sinistre.site,
+                dateCreation__year=current_year,
+                dateCreation__month=current_month
+            ).count()
+
             from accounts.models import Assurance, Ingenieur, Legal
             directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+            ingenieurs = Ingenieur.objects.all()
+
+            if claims_this_month >= 3:
+                alert_msg = f"ALERTE CRITIQUE: Le site {sinistre.site.codeSite} a enregistré {claims_this_month} sinistres ce mois-ci."
+                _create_notification(directeurs_assurance, alert_msg, lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+                _create_notification(ingenieurs, alert_msg, lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+            
+            # 1. Informer le Directeur Assurance
             _create_notification(directeurs_assurance, f"Nouveau sinistre déclaré : {sinistre.idSinistre} ({sinistre.get_nature_display()}).", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
             
             # 2. Informer l'Ingénieur
-            ingenieurs = Ingenieur.objects.all()
             _create_notification(ingenieurs, f"Besoin d'expertise pour le sinistre {sinistre.idSinistre}.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
             
             # 3. Informer le rôle Legal si Vol ou Vandalisme
@@ -789,8 +805,8 @@ class SinistreValidationAssuranceView(APIView):
                 sinistre.statut = 'EN_VALIDATION_HSE'
                 msg = 'Dossier validé. Transmis au service HSE pour rapport d\'expertise.'
             else:
-                sinistre.statut = 'TRANSMIS_ASSUREUR'
-                msg = 'Dossier validé. Transmis pour décision finale.'
+                sinistre.statut = 'VALIDE'
+                msg = 'Dossier validé en interne. Prêt pour transmission.'
 
             sinistre.save()
             _log_changement_statut(sinistre, ancien_statut, sinistre.statut, request.user, msg)
@@ -805,6 +821,12 @@ class SinistreValidationAssuranceView(APIView):
                 hses = Hse.objects.all()
                 lien = f"/gestion/{sinistre.idSinistre}"
                 _create_notification(hses, f"Dossier {sinistre.idSinistre} validé par l'assurance. En attente du rapport d'expertise HSE.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
+            elif sinistre.statut == 'VALIDE':
+                # Direct validation (no Legal/HSE step needed)
+                from accounts.models import Assurance as AssuranceModel
+                directeurs = AssuranceModel.objects.filter(role=AssuranceModel.RoleAssurance.DIRECTRICE)
+                lien = f"/gestion/{sinistre.idSinistre}"
+                _create_notification(directeurs, f"Dossier {sinistre.idSinistre} validé en interne. Prêt pour transmission à l'assureur.", lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
         elif action == 'REJETER':
             ancien_statut = sinistre.statut
@@ -814,6 +836,18 @@ class SinistreValidationAssuranceView(APIView):
             _log_changement_statut(
                 sinistre, ancien_statut, 'REJET_POUR_COMPLEMENT', request.user,
                 f'Dossier rejeté pour complément. Motif : {commentaire}'
+            )
+
+            # Notifier les ingénieurs du rejet pour complément
+            from accounts.models import Ingenieur
+            ingenieurs = Ingenieur.objects.all()
+            lien = f"/declarations/completer/{sinistre.idSinistre}"
+            _create_notification(
+                ingenieurs,
+                f"L'assurance a demandé des modifications pour le dossier {sinistre.idSinistre}. Motif : {commentaire}",
+                lien,
+                expediteur=request.user,
+                sinistre_id=sinistre.idSinistre
             )
 
         else:
@@ -834,7 +868,7 @@ class SinistreValidationLegalView(APIView):
     POST /api/sinistres/<pk>/validation-legal/
 
     Le service Légal ajoute le numéro du PV de Police.
-    Transition : EN_VALIDATION_LEGAL → TRANSMIS_ASSUREUR
+    Transition : EN_VALIDATION_LEGAL → VALIDE
 
     Body JSON :
     {
@@ -867,12 +901,24 @@ class SinistreValidationLegalView(APIView):
         sinistre.observationsLegal = request.data.get(
             'observationsLegal', sinistre.observationsLegal
         )
-        sinistre.statut = 'TRANSMIS_ASSUREUR'
+        sinistre.statut = 'VALIDE'
         sinistre.save()
 
         _log_changement_statut(
-            sinistre, ancien_statut, 'TRANSMIS_ASSUREUR', request.user,
-            f'PV de Police ajouté (N° {numero_pv}). Dossier transmis à l\'assureur.'
+            sinistre, ancien_statut, 'VALIDE', request.user,
+            f'PV de Police ajouté (N° {numero_pv}). Dossier validé en interne.'
+        )
+
+        # Notifier l'assurance que le PV légal est prêt
+        from accounts.models import Assurance
+        directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+        lien = f"/gestion/{sinistre.idSinistre}"
+        _create_notification(
+            directeurs_assurance,
+            f"Le service Légal a ajouté le PV de Police pour le dossier {sinistre.idSinistre}. Dossier prêt pour transmission.",
+            lien,
+            expediteur=request.user,
+            sinistre_id=sinistre.idSinistre
         )
 
         return Response(SinistreDetailSerializer(sinistre).data)
@@ -887,7 +933,7 @@ class SinistreValidationHSEView(APIView):
     POST /api/sinistres/<pk>/validation-hse/
 
     Le service HSE ajoute ses observations et mesures correctives.
-    Transition : EN_VALIDATION_HSE → TRANSMIS_ASSUREUR
+    Transition : EN_VALIDATION_HSE → VALIDE
 
     Body JSON :
     {
@@ -920,12 +966,24 @@ class SinistreValidationHSEView(APIView):
         sinistre.mesuresCorrectives = request.data.get(
             'mesuresCorrectives', sinistre.mesuresCorrectives
         )
-        sinistre.statut = 'TRANSMIS_ASSUREUR'
+        sinistre.statut = 'VALIDE'
         sinistre.save()
 
         _log_changement_statut(
-            sinistre, ancien_statut, 'TRANSMIS_ASSUREUR', request.user,
-            'Rapport HSE complété. Dossier transmis à l\'assureur.'
+            sinistre, ancien_statut, 'VALIDE', request.user,
+            'Rapport HSE complété. Dossier validé en interne.'
+        )
+
+        # Notifier l'assurance que le rapport HSE est prêt
+        from accounts.models import Assurance
+        directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
+        lien = f"/gestion/{sinistre.idSinistre}"
+        _create_notification(
+            directeurs_assurance,
+            f"Le service HSE a complété le rapport pour le dossier {sinistre.idSinistre}. Dossier prêt pour transmission.",
+            lien,
+            expediteur=request.user,
+            sinistre_id=sinistre.idSinistre
         )
 
         return Response(SinistreDetailSerializer(sinistre).data)
@@ -939,8 +997,8 @@ class SinistreDecisionView(APIView):
     """
     POST /api/sinistres/<pk>/decision/
 
-    L'assurance rend la décision finale.
-    Transition : TRANSMIS_ASSUREUR → VALIDE (DSR) ou REJETE (DSNR)
+    L'assurance rend la décision finale (transmission externe).
+    Transition : VALIDE → TRANSMIS_ASSUREUR ou REJETE
 
     Body JSON :
     {
@@ -955,9 +1013,9 @@ class SinistreDecisionView(APIView):
     def post(self, request, pk):
         sinistre = get_object_or_404(Sinistre, pk=pk)
 
-        if sinistre.statut != 'TRANSMIS_ASSUREUR':
+        if sinistre.statut != 'VALIDE':
             return Response(
-                {'error': f"Ce sinistre doit être en statut 'Transmis à l'Assureur'. "
+                {'error': f"Ce sinistre doit être en statut 'Validé' en interne. "
                           f"Statut actuel : {sinistre.get_statut_display()}."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -967,19 +1025,19 @@ class SinistreDecisionView(APIView):
 
         if decision == 'ACCEPTER':
             ancien_statut = sinistre.statut
-            sinistre.statut = 'VALIDE'
+            sinistre.statut = 'TRANSMIS_ASSUREUR'
             sinistre.montantIndemnisation = request.data.get(
                 'montantIndemnisation', sinistre.montantIndemnisation
             )
             sinistre.save()
             _log_changement_statut(
-                sinistre, ancien_statut, 'VALIDE', request.user,
-                f'Dossier accepté (DSR). Prêt pour remboursement. {commentaire}'
+                sinistre, ancien_statut, 'TRANSMIS_ASSUREUR', request.user,
+                f'Dossier transmis à l\'assureur externe. {commentaire}'
             )
             from accounts.models import Ingenieur
-            _create_notification(Ingenieur.objects.all(), f"Dossier {sinistre.idSinistre} accepté (DSR).", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
+            _create_notification(Ingenieur.objects.all(), f"Dossier {sinistre.idSinistre} transmis à l'assureur.", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
             if sinistre.createur and not hasattr(sinistre.createur, 'ingenieur'):
-                _create_notification(sinistre.createur, f"Dossier {sinistre.idSinistre} accepté (DSR).", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
+                _create_notification(sinistre.createur, f"Dossier {sinistre.idSinistre} transmis à l'assureur.", f"/gestion/{sinistre.idSinistre}", expediteur=request.user, sinistre_id=sinistre.idSinistre)
 
         elif decision == 'REFUSER':
             ancien_statut = sinistre.statut
@@ -1013,7 +1071,7 @@ class SinistreCloturerView(APIView):
     POST /api/sinistres/<pk>/cloturer/
 
     Seule l'Assurance peut clôturer un sinistre.
-    Transition : VALIDE | REJETE → CLOTURE
+    Transition : TRANSMIS_ASSUREUR | REJETE → CLOTURE
     """
     permission_classes = [permissions.IsAuthenticated, IsAssurance]
 
@@ -1021,9 +1079,9 @@ class SinistreCloturerView(APIView):
     def post(self, request, pk):
         sinistre = get_object_or_404(Sinistre, pk=pk)
 
-        if sinistre.statut not in ('VALIDE', 'REJETE'):
+        if sinistre.statut not in ('TRANSMIS_ASSUREUR', 'REJETE'):
             return Response(
-                {'error': f"Seuls les sinistres Validés ou Rejetés peuvent être clôturés. "
+                {'error': f"Seuls les sinistres Transmis ou Rejetés peuvent être clôturés. "
                           f"Statut actuel : {sinistre.get_statut_display()}."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1149,6 +1207,41 @@ class EquipementDetailView(APIView):
             {'message': 'Équipement supprimé.'},
             status=status.HTTP_204_NO_CONTENT,
         )
+
+
+# ═════════════════════════════════════════════
+#  EQUIPEMENT — Suggestions (Autocomplete)
+# ═════════════════════════════════════════════
+
+class EquipementSuggestionsView(APIView):
+    """
+    GET /api/equipements/suggestions/?q=Rou
+    Returns distinct equipment names and average values from past sinistres
+    for autocomplete suggestions.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        query = request.query_params.get('q', '').strip()
+
+        qs = Equipement.objects.values('nomMarque').annotate(
+            avg_value=models.Avg('valeurComptable'),
+            count=models.Count('idEquipement'),
+        ).order_by('-count')
+
+        if query:
+            qs = qs.filter(nomMarque__icontains=query)
+
+        suggestions = [
+            {
+                'nomMarque': item['nomMarque'],
+                'avgValue': round(item['avg_value'] or 0, 2),
+                'count': item['count'],
+            }
+            for item in qs[:20]
+        ]
+
+        return Response(suggestions)
 
 
 # ═════════════════════════════════════════════

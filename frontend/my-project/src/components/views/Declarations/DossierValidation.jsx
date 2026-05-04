@@ -186,7 +186,7 @@ export default function DossierValidation() {
       <div className="dv-main">
 
         <main className="dv-content">
-          <ClaimTimeline currentStatus={data.statut} />
+          <ClaimTimeline currentStatus={data.statut} nature={data.nature} />
 
           {/* Page header */}
           <div className="dv-page-header">

@@ -4,7 +4,8 @@ from rest_framework import status, permissions
 from django.db.models import Count, Sum
 from collections import defaultdict
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
+from django.db.models.functions import TruncMonth, TruncWeek
 
 from sinistres.models import Sinistre, HistoriqueStatut, STATUT_CHOICES, NATURE_CHOICES
 from accounts.permissions import IsAssurance
@@ -151,15 +152,12 @@ class StatistiquesDashboardView(APIView):
 
         avg_hours = round(sum(durations) / len(durations) / 3600, 1) if durations else 0
 
-        urgents = qs.filter(statut__in=['OUVERT', 'REJET_POUR_COMPLEMENT'], urgence='ELEVEE').count()
-
         return {
             'role': 'INGENIEUR',
             'kpis': [
                 {'key': 'en_attente', 'label': "En Attente d'Expertise", 'value': en_attente},
                 {'key': 'expertises_mois', 'label': 'Expertises ce Mois', 'value': expertises_mois},
                 {'key': 'temps_moyen', 'label': "Temps Moyen d'Expertise (h)", 'value': avg_hours},
-                {'key': 'urgents', 'label': 'Dossiers Urgents', 'value': urgents},
             ],
         }
 
@@ -348,4 +346,88 @@ class StatistiquesDelaisDetailView(APIView):
             'max_heures': maximum,
             'min_heures': minimum,
             'details': resultats
+        })
+
+# ═════════════════════════════════════════════
+#  ADVANCED ANALYTICS (Ingénieur)
+# ═════════════════════════════════════════════
+
+class IngenieurAnalyticsView(APIView):
+    """
+    GET /api/statistiques/ingenieur-analytics/
+    Renvoie les données analytiques avancées :
+    - Hotspots géographiques (par wilaya)
+    - Top 5 Sites problématiques
+    - Répartition par nature
+    - Coût estimé dans le temps
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = Sinistre.objects.all()
+
+        # Filtrage
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        wilaya = request.query_params.get('wilaya')
+
+        if start_date:
+            qs = qs.filter(dateSurvenance__gte=start_date)
+        if end_date:
+            qs = qs.filter(dateSurvenance__lte=end_date)
+        if wilaya:
+            qs = qs.filter(site__wilaya__icontains=wilaya)
+
+        # 1. Répartition par nature (Pie Chart)
+        nature_counts = qs.values('nature').annotate(count=Count('idSinistre')).order_by('-count')
+        nature_labels = dict(NATURE_CHOICES)
+        distribution_nature = [
+            {'name': nature_labels.get(item['nature'], item['nature']), 'value': item['count']}
+            for item in nature_counts
+        ]
+
+        # 2. Hotspots Géographiques (Bar Chart - Wilaya)
+        wilaya_counts = qs.values('site__wilaya').annotate(count=Count('idSinistre')).order_by('-count')
+        hotspots = [
+            {'name': item['site__wilaya'] or 'Inconnue', 'count': item['count']}
+            for item in wilaya_counts if item['site__wilaya']
+        ]
+
+        # 3. Top 5 Sites Problématiques (Horizontal Bar Chart)
+        site_counts = qs.values('site__codeSite', 'site__nomSite').annotate(count=Count('idSinistre')).order_by('-count')[:5]
+        top_sites = [
+            {'code': item['site__codeSite'], 'name': item['site__nomSite'] or item['site__codeSite'], 'count': item['count']}
+            for item in site_counts if item['site__codeSite']
+        ]
+
+        # 4. Cost Analysis (Line/Area Chart)
+        # Déterminer le groupement selon l'intervalle (mois par défaut, semaine si très court)
+        delta_days = 30
+        if start_date and end_date:
+            try:
+                sd = datetime.strptime(start_date, '%Y-%m-%d')
+                ed = datetime.strptime(end_date, '%Y-%m-%d')
+                delta_days = (ed - sd).days
+            except:
+                pass
+
+        if delta_days <= 60:
+            cost_qs = qs.annotate(date=TruncWeek('dateSurvenance'))
+        else:
+            cost_qs = qs.annotate(date=TruncMonth('dateSurvenance'))
+
+        costs = cost_qs.values('date').annotate(total=Sum('montantEstime')).order_by('date')
+        cost_analysis = [
+            {
+                'date': item['date'].strftime('%Y-%m-%d') if hasattr(item['date'], 'strftime') else str(item['date']).split(' ')[0],
+                'cost': float(item['total'] or 0)
+            }
+            for item in costs if item['date']
+        ]
+
+        return Response({
+            'distributionNature': distribution_nature,
+            'hotspots': hotspots,
+            'topSites': top_sites,
+            'costAnalysis': cost_analysis
         })

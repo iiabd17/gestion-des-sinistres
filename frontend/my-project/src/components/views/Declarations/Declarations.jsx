@@ -191,9 +191,13 @@ export default function Declarations() {
                 <div className="dcl-section-head" style={{ marginBottom: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', justifyContent: 'space-between' }}>
                       <div>
-                        <h1 className="dcl-title">Déclarations à Compléter</h1>
+                        <h1 className="dcl-title">
+                          {role === 'EQUIPE_TERRAIN' ? 'Mes Déclarations' : 'Déclarations à Compléter'}
+                        </h1>
                         <p className="dcl-subtitle">
-                          {filteredCompleter.length} dossier(s) nécessitent une expertise technique
+                          {role === 'EQUIPE_TERRAIN'
+                            ? `${filteredCompleter.length} dossier(s) déclaré(s)`
+                            : `${filteredCompleter.length} dossier(s) nécessitent une expertise technique`}
                         </p>
                       </div>
                       <div className="dcl-action-group">
@@ -340,7 +344,7 @@ export default function Declarations() {
                                   style={{ background: '#fce7f3', color: '#be185d', boxShadow: 'none' }}
                                   onClick={() => navigate(`/declarations/completer/${d.idSinistre}`)}
                                 >
-                                  Compléter
+                                  {role === 'EQUIPE_TERRAIN' ? 'Voir' : 'Compléter'}
                                 </button>
                               </div>
                             </td>

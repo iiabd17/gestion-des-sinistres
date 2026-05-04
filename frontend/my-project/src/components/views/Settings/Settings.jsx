@@ -43,6 +43,8 @@ export default function Settings() {
   const [userForm, setUserForm] = useState({ username:'', nom:'', prenom:'', email:'', tel:'', password:'', role:'INGENIEUR', role_assurance:'AGENT', specialite:'', matriculeTechnique:'', departement:'', fonction:'', matricule:'', division:'', zoneIntervention:'' })
 
   // ── Équipements ──
+  const [equipements, setEquipements] = useState([])
+  const [loadingEq, setLoadingEq] = useState(false)
   const [eqForm, setEqForm] = useState({ nomMarque:'', numeroSerie:'', quantiteImpactee:'', valeurComptable:'' })
 
   // Load sites
@@ -78,6 +80,16 @@ export default function Settings() {
       .then(r => setFranchises(Array.isArray(r.data) ? r.data : []))
       .catch(() => toast.error("Impossible de charger les franchises."))
       .finally(() => setLoadingFranchises(false))
+  }, [activeTab])
+
+  // Load Equipements
+  useEffect(() => {
+    if (activeTab !== 'equipements' || !canEquip) return
+    setLoadingEq(true)
+    api.get('/equipements/')
+      .then(r => setEquipements(Array.isArray(r.data) ? r.data : []))
+      .catch(() => toast.error("Impossible de charger les équipements."))
+      .finally(() => setLoadingEq(false))
   }, [activeTab])
 
   // ── Handlers ──
@@ -177,9 +189,26 @@ export default function Settings() {
   const handleAddEquipement = (e) => {
     e.preventDefault()
     if (!eqForm.nomMarque.trim()) return toast.error("Nom de l'équipement obligatoire.")
-    toast.info("Les équipements sont liés aux sinistres via l'expertise. Utilisez la page de complétion du dossier.")
-    setEqForm({ nomMarque:'', numeroSerie:'', quantiteImpactee:'', valeurComptable:'' })
-    setShowAddEqForm(false)
+    
+    // Convert to numbers if present to avoid validation errors
+    const payload = {
+      nomMarque: eqForm.nomMarque,
+      numeroSerie: eqForm.numeroSerie || '',
+      quantiteImpactee: eqForm.quantiteImpactee ? parseInt(eqForm.quantiteImpactee, 10) : 1,
+      valeurComptable: eqForm.valeurComptable ? parseFloat(eqForm.valeurComptable) : null
+    };
+
+    api.post('/equipements/', payload)
+      .then((r) => {
+        toast.success("Équipement ajouté au catalogue.")
+        setEquipements(eq => [r.data, ...eq])
+        setEqForm({ nomMarque:'', numeroSerie:'', quantiteImpactee:'', valeurComptable:'' })
+        setShowAddEqForm(false)
+      })
+      .catch(err => {
+        toast.error("Erreur lors de l'ajout.")
+        console.error(err)
+      })
   }
 
   const sf = (field, val) => setSiteForm(p => ({ ...p, [field]: val }))
@@ -405,14 +434,32 @@ export default function Settings() {
                   <div className="st-form-grid st-form-grid--2">
                     <div className="st-field"><label>NOM / MARQUE *</label><input className="st-input" placeholder="Routeur Huawei HW-CR-88" value={eqForm.nomMarque} onChange={e=>ef('nomMarque',e.target.value)} required /></div>
                     <div className="st-field"><label>N° DE SÉRIE</label><input className="st-input" placeholder="SN-2024-00452" value={eqForm.numeroSerie} onChange={e=>ef('numeroSerie',e.target.value)} /></div>
-                    <div className="st-field"><label>QUANTITÉ</label><input className="st-input" type="number" min="1" placeholder="3" value={eqForm.quantiteImpactee} onChange={e=>ef('quantiteImpactee',e.target.value)} /></div>
+                    <div className="st-field"><label>QUANTITÉ PAR DÉFAUT</label><input className="st-input" type="number" min="1" placeholder="1" value={eqForm.quantiteImpactee} onChange={e=>ef('quantiteImpactee',e.target.value)} /></div>
                     <div className="st-field"><label>VALEUR COMPTABLE (DZD)</label><input className="st-input" type="number" min="0" step="0.01" placeholder="450000" value={eqForm.valeurComptable} onChange={e=>ef('valeurComptable',e.target.value)} /></div>
                   </div>
                   <button type="submit" className="st-btn-submit"><IconPlus /> Ajouter</button>
                 </form>
               )}
 
-              <div className="st-info-banner"><IconInfo /><span>Les équipements sont liés aux sinistres lors de l'expertise technique. Accédez à <b>Déclarations → Compléter</b> pour associer un équipement à un dossier.</span></div>
+              <div className="st-info-banner" style={{ marginBottom: '1.5rem' }}><IconInfo /><span>Ce catalogue permet d'avoir une base de données. Les équipements seront liés spécifiquement aux sinistres lors de l'expertise technique.</span></div>
+
+              {/* Equipements Table */}
+              <div className="st-table-wrap">
+                {loadingEq ? <p className="st-empty">Chargement...</p> : equipements.length===0 ? <p className="st-empty">Aucun équipement enregistré dans le catalogue.</p> : (
+                  <table className="st-table">
+                    <thead><tr><th>ID</th><th>NOM / MARQUE</th><th>N° DE SÉRIE</th><th>QUANTITÉ DÉFAUT</th><th>VALEUR UNITAIRE (DZD)</th></tr></thead>
+                    <tbody>{equipements.map(eq=>(
+                      <tr key={eq.id}>
+                        <td style={{color:'#64748b'}}>#{eq.id}</td>
+                        <td style={{fontWeight:600}}>{eq.nomMarque}</td>
+                        <td>{eq.numeroSerie || '—'}</td>
+                        <td>{eq.quantiteImpactee}</td>
+                        <td>{eq.valeurComptable ? parseFloat(eq.valeurComptable).toLocaleString('fr-FR') : 'Non définie'}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </div>
             </section>
           )}
 

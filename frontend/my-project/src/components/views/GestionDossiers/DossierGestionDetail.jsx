@@ -7,6 +7,7 @@ import jsPDF from 'jspdf'
 import '../Declarations/DossierValidation.css'
 import '../Declarations/DossierCompleterDetail.css'
 import './DossierGestionDetail.css'
+import ClaimTimeline from '../../ClaimTimeline/ClaimTimeline'
 
 const NATURE_STYLES = {
   'INCENDIE':            { bg: '#fef9c3', color: '#a16207' },
@@ -155,6 +156,7 @@ export default function DossierGestionDetail() {
       <div className="dv-main">
 
         <main className="dv-content">
+          <ClaimTimeline currentStatus={data.statut} nature={data.nature} />
           <div className="dv-page-header">
             <div className="dv-page-meta">
               <span className="dv-eyebrow"><IconDocument />{data.statut_label?.toUpperCase() || data.statut}</span>
@@ -180,9 +182,11 @@ export default function DossierGestionDetail() {
                     Valider Clôture
                   </button>
                 )}
-                <button className="dgd-btn-secondary" onClick={() => setIsEditing(!isEditing)}>
-                  <IconEdit /> {isEditing ? 'Terminer' : 'Modifier'}
-                </button>
+                {user?.role !== 'EQUIPE_TERRAIN' && (
+                  <button className="dgd-btn-secondary" onClick={() => setIsEditing(!isEditing)}>
+                    <IconEdit /> {isEditing ? 'Terminer' : 'Modifier'}
+                  </button>
+                )}
                 <button className="dgd-btn-secondary" onClick={exportPDF}>
                   <IconDownload /> Export PDF
                 </button>
@@ -239,7 +243,7 @@ export default function DossierGestionDetail() {
               </section>
 
               {/* Observations Ingénieur */}
-              {data.observationsIngenieur && (
+              {data.observationsIngenieur && user?.role !== 'EQUIPE_TERRAIN' && (
                 <section className="dv-card">
                   <h2 className="dv-card-title">Observations Ingénieur</h2>
                   <p className="dv-info-desc" style={{ marginTop: 8 }}>{data.observationsIngenieur}</p>
@@ -271,7 +275,7 @@ export default function DossierGestionDetail() {
               )}
 
               {/* Service Légal */}
-              {data.observationsLegal && (
+              {data.observationsLegal && user?.role !== 'EQUIPE_TERRAIN' && (
                 <section className="dv-card">
                   <h2 className="dv-card-title">Service Légal</h2>
                   <div className="dv-info-grid">
@@ -281,7 +285,7 @@ export default function DossierGestionDetail() {
               )}
 
               {/* Service HSE */}
-              {(data.observationsHSE || data.mesuresCorrectives) && (
+              {(data.observationsHSE || data.mesuresCorrectives) && user?.role !== 'EQUIPE_TERRAIN' && (
                 <section className="dv-card">
                   <h2 className="dv-card-title">Service HSE</h2>
                   <div className="dv-info-grid">
