@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useContext } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../../api'
 import { toast } from 'react-toastify'
 import { AuthContext } from '../../../context/AuthContext'
@@ -23,6 +23,7 @@ const NATURE_STYLES = {
 export default function DossierGestionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const fileInputRef = useRef(null)
   const { user, unreadNotifsCount } = useContext(AuthContext)
   const isAdminOrAssurance = ['ADMIN', 'ASSURANCE'].includes(user?.role)
@@ -113,12 +114,27 @@ export default function DossierGestionDetail() {
     }
   }
 
+  const handleCloturer = async () => {
+    if (!window.confirm('Clôturer définitivement ce dossier ?')) return
+    try {
+      const res = await api.post(`/sinistres/${id}/cloturer/`)
+      setData(res.data)
+      toast.success('Dossier clôturé avec succès')
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Erreur lors de la clôture")
+    }
+  }
+
   const handleArchiver = async () => {
     if (!window.confirm('Archiver définitivement ce dossier ?')) return
     try {
       const res = await api.post(`/sinistres/${id}/archiver/`)
       setData(res.data)
       toast.success('Dossier archivé avec succès')
+      // Si on est dans la vue gestion, on redirige vers la liste car le dossier n'y appartient plus
+      if (location.pathname.startsWith('/gestion')) {
+        navigate('/gestion')
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || "Erreur lors de l'archivage")
     }
@@ -128,11 +144,36 @@ export default function DossierGestionDetail() {
     try {
       toast.info('Génération du PDF...')
       const pdf = new jsPDF('p', 'mm', 'a4')
-      let y = 20
+
+      try {
+        const logoImg = await new Promise((resolve, reject) => {
+          const img = new Image(); img.crossOrigin = 'Anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = '/logo.png';
+        });
+        const c = document.createElement('canvas');
+        c.width = logoImg.width; c.height = logoImg.height;
+        c.getContext('2d').drawImage(logoImg, 0, 0);
+        const logoData = c.toDataURL('image/png');
+        pdf.addImage(logoData, 'PNG', 160, 10, 35, 10);
+      } catch (e) {
+        console.error("Erreur chargement logo", e);
+      }
+
+      let y = 30
       pdf.setFontSize(22); pdf.setTextColor(226, 0, 15)
       pdf.text(`Dossier Sinistre: #${id}`, 20, y); y += 10
       pdf.setFontSize(11); pdf.setTextColor(113, 128, 150)
-      pdf.text(`Déclaré le : ${new Date(data.dateCreation).toLocaleDateString('fr-FR')}`, 20, y); y += 15
+      pdf.text(`Déclaré le : ${new Date(data.dateCreation).toLocaleDateString('fr-FR')}`, 20, y); y += 8
+      
+      const validationHistory = data.historiqueStatuts?.find(h => h.nouveauStatut === 'VALIDE');
+      if (validationHistory) {
+        pdf.text(`Validé par : ${validationHistory.modifiePar_nom || 'Inconnu'}`, 20, y); y += 10
+      } else {
+        y += 2
+      }
+
       pdf.setFontSize(16); pdf.setTextColor(26, 32, 44)
       pdf.text("Informations de l'incident", 20, y); y += 10
       pdf.setFontSize(12); pdf.setTextColor(74, 85, 104)
@@ -219,7 +260,12 @@ export default function DossierGestionDetail() {
                     Valider Clôture
                   </button>
                 )}
-                {isAdminOrAssurance && (
+                {['VALIDE', 'EN_VALIDATION_LEGAL', 'EN_VALIDATION_HSE', 'TRANSMIS_ASSUREUR', 'REJETE'].includes(data.statut) && isAdminOrAssurance && (
+                  <button className="dgd-btn-secondary" style={{ background: '#E2000F', color: 'white', borderColor: '#E2000F' }} onClick={handleCloturer}>
+                    <IconCheckCircle /> Clôturer
+                  </button>
+                )}
+                {data.statut !== 'ARCHIVE' && isAdminOrAssurance && (
                   <button
                     className="dgd-btn-secondary"
                     style={{ borderColor: '#6366f1', color: '#6366f1' }}
@@ -228,7 +274,7 @@ export default function DossierGestionDetail() {
                     <IconArchive /> Archiver
                   </button>
                 )}
-                {user?.role !== 'EQUIPE_TERRAIN' && (
+                {user?.role !== 'EQUIPE_TERRAIN' && !['CLOTURE', 'CLOTURE_SOUS_FRANCHISE', 'ARCHIVE'].includes(data.statut) && (
                   <button className="dgd-btn-secondary" onClick={() => setIsEditing(!isEditing)}>
                     <IconEdit /> {isEditing ? 'Terminer' : 'Modifier'}
                   </button>
@@ -236,7 +282,13 @@ export default function DossierGestionDetail() {
                 <button className="dgd-btn-secondary" onClick={exportPDF}>
                   <IconDownload /> Export PDF
                 </button>
-                <button className="dgd-btn-close" onClick={() => navigate('/gestion')}>Fermer</button>
+                <button className="dgd-btn-close" onClick={() => {
+                  if (location.pathname.startsWith('/archives')) {
+                    navigate('/archives')
+                  } else {
+                    navigate('/gestion')
+                  }
+                }}>Fermer</button>
               </div>
             </div>
           </div>
@@ -305,25 +357,46 @@ export default function DossierGestionDetail() {
 
               {/* Input Numéro PV Légal */}
               {data.statut === 'EN_VALIDATION_LEGAL' && (
-                <section className="dv-card" style={{ marginBottom: '24px' }}>
-                  <h2 className="dv-card-title dcd-section-title" style={{ fontSize: '13px' }}>NUMÉRO DU PV</h2>
-                  <div style={{ display: 'flex', alignItems: 'center', background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '8px', padding: '12px 16px', marginTop: '12px' }}>
+                <section className="dv-card" style={{ marginBottom: '24px', border: user?.role === 'LEGAL' ? '1.5px solid #E2000F' : undefined, background: user?.role === 'LEGAL' ? '#fffbfb' : undefined }}>
+                  <h2 className="dv-card-title dcd-section-title" style={{ fontSize: '13px' }}>NUMÉRO DU PV DE POLICE</h2>
+                  {user?.role === 'LEGAL' && (
+                    <p style={{ fontSize: '12px', color: '#E2000F', marginTop: '4px', marginBottom: '12px', fontWeight: 500 }}>
+                      ⚠ Vous devez renseigner le numéro du PV pour valider cette étape.
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#f9fafb', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 16px', marginTop: '12px' }}>
                     <div style={{ color: '#9ca3af', marginRight: '12px', display: 'flex' }}><IconGavel /></div>
-                    {isEditing ? (
+                    {user?.role === 'LEGAL' ? (
                       <input
                         type="text"
                         value={numeroPV}
                         onChange={(e) => setNumeroPV(e.target.value)}
-                        onBlur={handleSavePV}
-                        placeholder="N° PV-2023-000"
-                        style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', width: '100%', color: '#4b5563', fontFamily: 'monospace' }}
+                        placeholder="Saisissez le N° du PV (ex: PV-2026-00123)"
+                        style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', width: '100%', color: '#1e293b', fontFamily: 'monospace', fontWeight: 600 }}
                       />
                     ) : (
                       <span style={{ fontSize: '14px', color: '#4b5563', fontFamily: 'monospace' }}>
-                        {numeroPV || 'Non renseigné'}
+                        {numeroPV || 'En attente du service Légal...'}
                       </span>
                     )}
                   </div>
+                  {user?.role === 'LEGAL' && (
+                    <button
+                      onClick={handleSavePV}
+                      disabled={!numeroPV || !numeroPV.trim()}
+                      style={{
+                        marginTop: '16px', width: '100%', padding: '12px 24px',
+                        background: numeroPV?.trim() ? '#E2000F' : '#fca5a5',
+                        color: '#fff', border: 'none', borderRadius: '10px',
+                        fontSize: '13px', fontWeight: 700, cursor: numeroPV?.trim() ? 'pointer' : 'not-allowed',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        transition: 'all 0.2s', boxShadow: numeroPV?.trim() ? '0 4px 12px rgba(226,0,15,0.2)' : 'none',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <IconGavel /> Valider le PV et passer l'étape Légale
+                    </button>
+                  )}
                 </section>
               )}
 
@@ -390,20 +463,6 @@ export default function DossierGestionDetail() {
 
             {/* RIGHT */}
             <div className="dv-right">
-              {/* Statut */}
-              <section className="dv-card">
-                <h2 className="dv-card-title dcd-section-title">Statut du Dossier</h2>
-                {!isEditing ? (
-                  <div className="dgd-statut-box">
-                    <span className="dgd-statut-val">{data.statut_label}</span>
-                  </div>
-                ) : (
-                  <select className="dgd-select" value={data.statut} onChange={handleStatutChange}>
-                    {statuts.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
-                  </select>
-                )}
-              </section>
-
               {/* Équipements */}
               <section className="dv-card">
                 <div className="dv-card-title-row dv-card-title-row--between">
@@ -511,4 +570,5 @@ function IconDownload() { return <svg viewBox="0 0 24 24" fill="none" stroke="cu
 function IconFolder() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2z" /></svg> }
 function IconFile() { return <svg viewBox="0 0 24 24" fill="none" stroke="#E2000F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg> }
 function IconGavel() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16"><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10" /><path d="m16 16 6-6" /><path d="m8 8 6-6" /><path d="m9 7 8 8" /><path d="m21 11-8-8" /></svg> }
+function IconCheckCircle() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg> }
 function IconArchive() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> }

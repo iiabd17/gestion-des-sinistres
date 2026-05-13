@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useContext } from 'react'
+import { useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import jsPDF from 'jspdf'
@@ -29,6 +29,23 @@ export default function DossierValidation() {
   const [submitting, setSubmitting] = useState(false)
   const [showMotifModal, setShowMotifModal] = useState(false)
   const [motifText, setMotifText] = useState('')
+  const fileInputRef = useRef(null)
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const formData = new FormData()
+    formData.append('fichier', file)
+    formData.append('titreDoc', file.name)
+    formData.append('typePiece', user?.role === 'HSE' ? 'RAPPORT_HSE' : 'AUTRE')
+    try {
+      const res = await api.post(`/sinistres/${id}/pieces/`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      toast.success('Document ajouté')
+      setData(prev => ({ ...prev, piecesJointes: [...(prev.piecesJointes || []), res.data] }))
+    } catch {
+      toast.error("Erreur lors de l'ajout du document")
+    }
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -85,15 +102,37 @@ export default function DossierValidation() {
     try {
       toast.info('Génération du PDF...')
       const pdf = new jsPDF('p', 'mm', 'a4')
-      let y = 20
 
-      // Title
+      try {
+        const logoImg = await new Promise((resolve, reject) => {
+          const img = new Image(); img.crossOrigin = 'Anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = '/logo.png';
+        });
+        const c = document.createElement('canvas');
+        c.width = logoImg.width; c.height = logoImg.height;
+        c.getContext('2d').drawImage(logoImg, 0, 0);
+        const logoData = c.toDataURL('image/png');
+        pdf.addImage(logoData, 'PNG', 160, 10, 35, 10);
+      } catch (e) {
+        console.error("Erreur logo", e);
+      }
+
+      let y = 30
       pdf.setFontSize(22); pdf.setTextColor(226, 0, 15)
       pdf.text(`Dossier Sinistre: #${id}`, 20, y); y += 10
       pdf.setFontSize(11); pdf.setTextColor(113, 128, 150)
-      pdf.text(`Déclaré le : ${new Date(data.dateCreation).toLocaleDateString('fr-FR')}`, 20, y); y += 15
+      pdf.text(`Déclaré le : ${new Date(data.dateCreation).toLocaleDateString('fr-FR')}`, 20, y); y += 8
 
-      // Declarant
+      const validationHistory = data.historiqueStatuts?.find(h => h.nouveauStatut === 'VALIDE');
+      if (validationHistory) {
+        pdf.text(`Validé par : ${validationHistory.modifiePar_nom || 'Inconnu'}`, 20, y); y += 10
+      } else {
+        y += 2
+      }
+
+      // Incident info
       pdf.setFontSize(16); pdf.setTextColor(26, 32, 44)
       pdf.text("Informations du Déclarant", 20, y); y += 10
       pdf.setFontSize(12); pdf.setTextColor(74, 85, 104)
@@ -251,7 +290,8 @@ export default function DossierValidation() {
                 </div>
                 <div className="dv-site-photo">
                   <div className="dv-photo-bg" /><div className="dv-photo-overlay" />
-                  <svg className="dv-pylon-icon" viewBox="0 0 60 100" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" aria-hidden="true">
+                  <img src="/logo.png" alt="Djezzy" className="sb-brand-icon" />
+                  <svg viewBox="0 0 60 100" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" aria-hidden="true">
                     <line x1="30" y1="5" x2="30" y2="95"/><line x1="30" y1="20" x2="10" y2="50"/><line x1="30" y1="20" x2="50" y2="50"/>
                     <line x1="30" y1="35" x2="15" y2="55"/><line x1="30" y1="35" x2="45" y2="55"/>
                     <line x1="10" y1="50" x2="50" y2="50"/><line x1="15" y1="55" x2="45" y2="55"/>
@@ -305,10 +345,14 @@ export default function DossierValidation() {
               <section className="dv-card">
                 <div className="dv-card-title-row dv-card-title-row--between">
                   <h2 className="dv-card-title">Pièces Jointes</h2>
-                  <span className="dv-files-count">
-                    <IconFolder />
-                    {pieces.length} Fichier{pieces.length !== 1 ? 's' : ''}
-                  </span>
+                  <div className="dv-files-count" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={() => fileInputRef.current?.click()} className="dcd-add-btn">+ Ajouter</button>
+                    <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} />
+                    <span className="dv-files-count">
+                      <IconFolder />
+                      {pieces.length} Fichier{pieces.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
                 </div>
                 <div className="dv-pj-grid">
                   {pieces.length === 0 ? (
@@ -333,7 +377,7 @@ export default function DossierValidation() {
           {/* Bottom actions */}
           <div className="dv-actions">
             <button className="dv-hold-btn" onClick={() => setShowMotifModal(true)} disabled={submitting}>
-              Mettre en Attente (Infos Manquantes)
+              Demander Modification (Infos Manquantes)
             </button>
             <button className="dv-pdf-btn" onClick={exportPDF}>
               Imprimer le Dossier

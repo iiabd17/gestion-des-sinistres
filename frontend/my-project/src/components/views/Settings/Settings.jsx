@@ -37,6 +37,9 @@ export default function Settings() {
   // Modal de suppression
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [siteToDelete, setSiteToDelete] = useState(null)
+  
+  // Modal de détail utilisateur
+  const [selectedUser, setSelectedUser] = useState(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   // ── Comptes ──
@@ -360,7 +363,7 @@ export default function Settings() {
                   <table className="st-table">
                     <thead><tr><th>NOM</th><th>EMAIL</th><th>RÔLE</th><th>STATUT</th><th>ACTIONS</th></tr></thead>
                     <tbody>{users.map(u=>(
-                      <tr key={u.id}>
+                      <tr key={u.id} className="st-table-row-clickable" onClick={() => setSelectedUser(u)}>
                         <td style={{fontWeight:600}}>{u.nom} {u.prenom}</td>
                         <td style={{color:'#64748b',fontSize:13}}>{u.email}</td>
                         <td><span className="st-role-badge">{u.role}</span></td>
@@ -370,8 +373,8 @@ export default function Settings() {
                           </span>
                         </td>
                         <td>
-                          <button className="st-toggle-btn" onClick={()=>handleChangePassword(u.id, `${u.nom} ${u.prenom}`)} title="Changer le mot de passe">🔑</button>
-                          <button className="st-toggle-btn" onClick={()=>handleToggleUser(u.id)} title={u.estActif?'Désactiver':'Activer'}>{u.estActif?'⏸':'▶'}</button>
+                          <button className="st-toggle-btn" onClick={(e)=>{ e.stopPropagation(); handleChangePassword(u.id, `${u.nom} ${u.prenom}`); }} title="Changer le mot de passe">🔑</button>
+                          <button className="st-toggle-btn" onClick={(e)=>{ e.stopPropagation(); handleToggleUser(u.id); }} title={u.estActif?'Désactiver':'Activer'}>{u.estActif?'⏸':'▶'}</button>
                         </td>
                       </tr>
                     ))}</tbody>
@@ -510,7 +513,132 @@ export default function Settings() {
             </div>
           )}
 
+          {/* ═══ MODAL DÉTAIL UTILISATEUR ═══ */}
+          {selectedUser && (
+            <div className="st-modal-overlay" onClick={() => setSelectedUser(null)}>
+              <div className="st-user-detail-modal" onClick={(e) => e.stopPropagation()}>
+                <button className="st-detail-close" onClick={() => setSelectedUser(null)}><IconClose /></button>
+
+                {/* ── Header ── */}
+                <div className="st-detail-header">
+                  <div className="st-detail-avatar">
+                    {(selectedUser.nom?.[0] || '').toUpperCase()}{(selectedUser.prenom?.[0] || '').toUpperCase()}
+                  </div>
+                  <h2 className="st-detail-name">{selectedUser.nom} {selectedUser.prenom}</h2>
+                  <p className="st-detail-username">@{selectedUser.username}</p>
+                  <div className="st-detail-badges">
+                    <span className="st-detail-role-badge">{getRoleLabel(selectedUser.role)}</span>
+                    <span className={`st-status-badge ${selectedUser.estActif ? 'st-status--active' : 'st-status--inactive'}`}>
+                      <span className="st-status-dot" /> {selectedUser.estActif ? 'Actif' : 'Inactif'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── Body ── */}
+                <div className="st-detail-body">
+                  <div className="st-detail-section-label">Informations de Contact</div>
+                  <div className="st-detail-grid">
+                    <DetailField icon={<DIconMail />} label="Email" value={selectedUser.email} />
+                    <DetailField icon={<DIconPhone />} label="Téléphone" value={selectedUser.tel || '—'} />
+                    <DetailField icon={<DIconUser />} label="Nom d'utilisateur" value={selectedUser.username} />
+                    <DetailField icon={<DIconShield />} label="Rôle" value={getRoleLabel(selectedUser.role)} />
+                  </div>
+
+                  {/* ── Role-specific: Équipe Terrain ── */}
+                  {selectedUser.role === 'EQUIPE_TERRAIN' && (
+                    <>
+                      <div className="st-detail-section-label">Détails Professionnels</div>
+                      <div className="st-detail-grid">
+                        <DetailField icon={<DIconBuilding />} label="Département" value={selectedUser.departement || '—'} />
+                        <DetailField icon={<DIconBriefcase />} label="Fonction" value={selectedUser.fonction || '—'} />
+                        <DetailField icon={<DIconBadge />} label="Matricule" value={selectedUser.matricule || '—'} />
+                      </div>
+                    </>
+                  )}
+
+                  {/* ── Role-specific: Ingénieur ── */}
+                  {selectedUser.role === 'INGENIEUR' && (
+                    <>
+                      <div className="st-detail-section-label">Détails Professionnels</div>
+                      <div className="st-detail-grid">
+                        <DetailField icon={<DIconWrench />} label="Spécialité" value={selectedUser.specialite || '—'} />
+                        <DetailField icon={<DIconBadge />} label="Matricule Technique" value={selectedUser.matriculeTechnique || '—'} />
+                      </div>
+                    </>
+                  )}
+
+                  {/* ── Role-specific: Legal ── */}
+                  {selectedUser.role === 'LEGAL' && (
+                    <>
+                      <div className="st-detail-section-label">Détails Professionnels</div>
+                      <div className="st-detail-grid">
+                        <DetailField icon={<DIconScale />} label="Division" value={selectedUser.division || '—'} />
+                      </div>
+                    </>
+                  )}
+
+                  {/* ── Role-specific: HSE ── */}
+                  {selectedUser.role === 'HSE' && (
+                    <>
+                      <div className="st-detail-section-label">Détails Professionnels</div>
+                      <div className="st-detail-grid">
+                        <DetailField icon={<DIconMapPin />} label="Zone d'intervention" value={selectedUser.zoneIntervention || '—'} />
+                      </div>
+                    </>
+                  )}
+
+                  {/* ── Role-specific: Assurance ── */}
+                  {selectedUser.role === 'ASSURANCE' && selectedUser.role_assurance && (
+                    <>
+                      <div className="st-detail-section-label">Détails Professionnels</div>
+                      <div className="st-detail-grid">
+                        <DetailField icon={<DIconTag />} label="Sous-rôle" value={selectedUser.role_assurance === 'DIRECTRICE' ? 'Directrice' : 'Agent'} />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* ── Footer Actions ── */}
+                <div className="st-detail-footer">
+                  <button className="st-btn-white" onClick={() => handleChangePassword(selectedUser.id, `${selectedUser.nom} ${selectedUser.prenom}`)}>
+                    <DIconKey /> Changer le mot de passe
+                  </button>
+                  <button
+                    className={selectedUser.estActif ? 'st-btn-danger' : 'st-btn-submit'}
+                    onClick={() => { handleToggleUser(selectedUser.id); setSelectedUser(s => s ? {...s, estActif: !s.estActif} : null); }}
+                  >
+                    {selectedUser.estActif ? <><DIconPause /> Désactiver</> : <><DIconPlay /> Activer</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </main>
+    </div>
+  )
+}
+
+/* ── Helper: Role label mapping ── */
+const ROLE_LABELS = {
+  EQUIPE_TERRAIN: 'Équipe Terrain',
+  INGENIEUR: 'Ingénieur',
+  LEGAL: 'Service Légal',
+  HSE: 'Service HSE',
+  ASSURANCE: 'Service Assurance',
+  ADMIN: 'Administrateur',
+}
+function getRoleLabel(role) { return ROLE_LABELS[role] || role }
+
+/* ── Detail field component ── */
+function DetailField({ icon, label, value }) {
+  return (
+    <div className="st-detail-field">
+      <span className="st-detail-field-icon">{icon}</span>
+      <div className="st-detail-field-content">
+        <span className="st-detail-field-label">{label}</span>
+        <span className="st-detail-field-value">{value}</span>
+      </div>
     </div>
   )
 }
@@ -525,3 +653,21 @@ function IconBell(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 function IconUserC(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20}}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="9" r="3"/><path d="M6.17 18.34A4 4 0 0 1 10 16h4a4 4 0 0 1 3.83 2.34"/></svg>}
 function IconAlertTriangle() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:28,height:28}}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>; }
 function IconShield() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18}}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>; }
+function IconClose() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20}}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>; }
+
+/* ── Detail Modal SVG Icons (Lucide-style) ── */
+const DS = {width:16,height:16,flexShrink:0}
+function DIconMail(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>}
+function DIconPhone(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>}
+function DIconUser(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
+function DIconShield(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}
+function DIconBuilding(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>}
+function DIconBriefcase(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3"/><path d="M12 12h.01"/></svg>}
+function DIconBadge(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h6"/></svg>}
+function DIconWrench(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>}
+function DIconScale(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>}
+function DIconMapPin(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>}
+function DIconTag(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2z"/><path d="M7 7h.01"/></svg>}
+function DIconKey(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>}
+function DIconPause(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>}
+function DIconPlay(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={DS}><polygon points="5 3 19 12 5 21 5 3"/></svg>}

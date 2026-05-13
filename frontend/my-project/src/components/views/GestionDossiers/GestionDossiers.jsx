@@ -86,7 +86,7 @@ export default function GestionDossiers() {
               <label>STATUT</label>
               <select className="gd-select" value={filterStatut} onChange={e => { setFilterStatut(e.target.value); setCurrentPage(1); }}>
                 <option value="">Tous les statuts</option>
-                {statuts.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
+                {statuts.filter(s => s.code !== 'ARCHIVE').map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
               </select>
             </div>
             <div className="gd-filter-item">

@@ -3,56 +3,81 @@ import './ClaimTimeline.css';
 
 /**
  * Build the step list dynamically based on nature.
- * Legal step only for VOL / ACTE_DE_SABOTAGE.
- * HSE step only for INCENDIE.
  */
 function buildSteps(nature) {
   const steps = [
-    { id: 'OUVERT', label: 'Déclaration' },
-    { id: 'EN_EXPERTISE', label: 'Expertise' },
+    { id: 'DECLARATION', label: 'Déclaration' },
+    { id: 'EXPERTISE', label: 'Expertise' },
+    { id: 'VALIDATION', label: 'Validé' },
   ];
 
   if (nature === 'VOL' || nature === 'ACTE_DE_SABOTAGE') {
-    steps.push({ id: 'EN_VALIDATION_LEGAL', label: 'Légal' });
+    steps.push({ id: 'LEGAL', label: 'Légal' });
   }
 
   if (nature === 'INCENDIE') {
-    steps.push({ id: 'EN_VALIDATION_HSE', label: 'HSE' });
+    steps.push({ id: 'HSE', label: 'HSE' });
   }
 
   steps.push(
-    { id: 'VALIDE', label: 'Validé' },
-    { id: 'TRANSMIS_ASSUREUR', label: 'Transmis' },
     { id: 'CLOTURE', label: 'Clôturé' },
+    { id: 'ARCHIVE', label: 'Archivé' },
   );
 
   return steps;
 }
 
-// Map alternative statuses to the main ones for the timeline
-const STATUS_MAP = {
-  'REJET_POUR_COMPLEMENT': 'EN_EXPERTISE',
-  'ATTENTE_VALIDATION_FRANCHISE': 'VALIDE',
-  'CLOTURE_SOUS_FRANCHISE': 'CLOTURE',
-  'REJETE': 'VALIDE',
-  'ARCHIVE': 'CLOTURE',
-};
-
-// Statuses that represent a "rejected / complement" loop
-const REJECTED_STATUSES = ['REJET_POUR_COMPLEMENT'];
-
 export default function ClaimTimeline({ currentStatus, nature }) {
   const steps = buildSteps(nature);
 
-  const getStepIndex = (status) => {
-    const mappedStatus = STATUS_MAP[status] || status;
-    return steps.findIndex(s => s.id === mappedStatus);
-  };
+  let activeStepId = '';
+  let isRejected = false;
 
-  const currentIndex = getStepIndex(currentStatus);
-  const isRejected = REJECTED_STATUSES.includes(currentStatus);
-  const progressPercent = currentIndex >= 0
-    ? (currentIndex / (steps.length - 1)) * 90 + 5
+  switch (currentStatus) {
+    case 'OUVERT':
+      activeStepId = 'EXPERTISE';
+      break;
+    case 'REJET_POUR_COMPLEMENT':
+      activeStepId = 'EXPERTISE';
+      isRejected = true;
+      break;
+    case 'EN_EXPERTISE':
+      activeStepId = 'VALIDATION';
+      break;
+    case 'EN_VALIDATION_LEGAL':
+      activeStepId = 'LEGAL';
+      break;
+    case 'EN_VALIDATION_HSE':
+      activeStepId = 'HSE';
+      break;
+    case 'VALIDE':
+    case 'ATTENTE_VALIDATION_FRANCHISE':
+      activeStepId = 'CLOTURE';
+      break;
+    case 'CLOTURE':
+    case 'CLOTURE_SOUS_FRANCHISE':
+    case 'TRANSMIS_ASSUREUR':
+      activeStepId = 'ARCHIVE';
+      break;
+    case 'ARCHIVE':
+    case 'REJETE':
+      activeStepId = 'DONE';
+      break;
+    default:
+      activeStepId = 'EXPERTISE';
+  }
+
+  let activeIndex = steps.findIndex(s => s.id === activeStepId);
+  if (activeStepId === 'DONE') {
+    activeIndex = -1;
+  }
+
+  const completedUpToIndex = activeIndex === -1 ? steps.length - 1 : activeIndex - 1;
+
+  // The progress bar should reach the active step (or the last completed step if DONE)
+  const progressIndex = activeIndex === -1 ? steps.length - 1 : activeIndex;
+  const progressPercent = progressIndex >= 0
+    ? (progressIndex / (steps.length - 1)) * 100
     : 0;
 
   return (
@@ -66,8 +91,8 @@ export default function ClaimTimeline({ currentStatus, nature }) {
         </div>
         
         {steps.map((step, index) => {
-          const isActive = index === currentIndex;
-          const isCompleted = index < currentIndex;
+          const isActive = index === activeIndex;
+          const isCompleted = index <= completedUpToIndex;
 
           let stepClass = 'timeline-step';
           if (isActive && isRejected) {

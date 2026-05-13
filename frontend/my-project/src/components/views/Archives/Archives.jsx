@@ -12,9 +12,33 @@ export default function Archives() {
   const [currentPage, setCurrentPage] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
 
+  const [filterStatut, setFilterStatut] = useState('')
+  const [filterNature, setFilterNature] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
+  const [natures, setNatures] = useState([])
+  const [statuts, setStatuts] = useState([])
+
+  useEffect(() => {
+    api.get('/constants/')
+      .then(res => {
+        setNatures(res.data.natures || [])
+        setStatuts(res.data.statuts || [])
+      })
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     setLoading(true)
-    api.get(`/sinistres/?statut=ARCHIVE&page=${currentPage}&page_size=10`)
+    let url = `/sinistres/?statut=ARCHIVE&page=${currentPage}&page_size=10`
+    if (filterNature) url += `&nature=${filterNature}`
+    if (dateFrom) url += `&date_du=${dateFrom}`
+    if (dateTo) url += `&date_au=${dateTo}`
+    // Intentionally ignoring filterStatut for the backend call since this is the Archives page,
+    // where everything must be ARCHIVE.
+
+    api.get(url)
       .then(res => {
         const data = res.data
         if (data.results) {
@@ -29,7 +53,7 @@ export default function Archives() {
         console.error('Erreur chargement archives:', err)
       })
       .finally(() => setLoading(false))
-  }, [currentPage])
+  }, [currentPage, filterNature, dateFrom, dateTo])
 
   const totalPages = Math.ceil(totalCount / 10)
 
@@ -45,17 +69,46 @@ export default function Archives() {
           {/* Header */}
           <header className="arc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h1>Archives des Dossiers</h1>
-            <div className="arc-search" style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '10px 16px', borderRadius: '10px', border: '1px solid #e2e8f0', width: '300px' }}>
-              <IconSearch style={{ marginRight: '10px', color: '#a0aec0', width: 18, height: 18 }} />
-              <input 
-                type="text" 
-                placeholder="Rechercher par ID..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ border: 'none', outline: 'none', width: '100%', fontSize: '14px', color: '#2d3748', background: 'transparent' }}
-              />
-            </div>
           </header>
+
+          {/* Filters */}
+          <div className="arc-filters-card">
+            <div className="arc-filter-item">
+              <label>STATUT</label>
+              <select className="arc-select" value={filterStatut} onChange={e => { setFilterStatut(e.target.value); setCurrentPage(1); }}>
+                <option value="">Tous les statuts</option>
+                {statuts.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
+              </select>
+            </div>
+            <div className="arc-filter-item">
+              <label>NATURE</label>
+              <select className="arc-select" value={filterNature} onChange={e => { setFilterNature(e.target.value); setCurrentPage(1); }}>
+                <option value="">Toutes les natures</option>
+                {natures.map(n => <option key={n.code} value={n.code}>{n.label}</option>)}
+              </select>
+            </div>
+            <div className="arc-filter-item" style={{ flex: 2 }}>
+              <label>PÉRIODE</label>
+              <div className="arc-date-range">
+                <input type="date" className="arc-date-input" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                <span style={{ color: '#cbd5e0' }}>→</span>
+                <input type="date" className="arc-date-input" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              </div>
+            </div>
+            <div className="arc-filter-item" style={{ flex: 1.5 }}>
+              <label>RECHERCHER</label>
+              <div style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '0 12px', borderRadius: '8px', border: '1px solid #e2e8f0', height: '42px' }}>
+                <IconSearch style={{ marginRight: '8px', color: '#a0aec0', width: 16, height: 16, flexShrink: 0 }} />
+                <input 
+                  type="text" 
+                  placeholder="Rechercher par ID..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ border: 'none', outline: 'none', width: '100%', fontSize: '13.5px', color: '#2d3748', background: 'transparent' }}
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Stats Grid */}
           <section className="arc-stats-grid">
@@ -129,7 +182,7 @@ export default function Archives() {
                         <span className="arc-status">ARCHIVÉ</span>
                       </td>
                       <td>
-                        <button className="arc-action-btn" onClick={() => navigate('/gestion/' + d.idSinistre)}>
+                        <button className="arc-action-btn" onClick={() => navigate('/archives/' + d.idSinistre)}>
                           <IconEye />
                         </button>
                       </td>

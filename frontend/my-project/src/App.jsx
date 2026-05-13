@@ -62,6 +62,7 @@ function App() {
             {/* Routes Archives */}
             <Route element={<ProtectedRoute allowedRoles={['LEGAL', 'ASSURANCE', 'ADMIN', 'HSE', 'INGENIEUR']} />}>
               <Route path="/archives" element={<ArchivesPage />} />
+              <Route path="/archives/:id" element={<DossierGestionDetailPage />} />
             </Route>
 
             {/* Routes Statistiques (Assurance / Admin) */}
