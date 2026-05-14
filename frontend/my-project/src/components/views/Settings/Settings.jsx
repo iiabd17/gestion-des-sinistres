@@ -224,6 +224,21 @@ export default function Settings() {
       })
   }
 
+  const handleDeleteEquipement = (id) => {
+    if (!window.confirm("Supprimer cet équipement du catalogue ?")) return
+    console.log("Deleting equipment with id:", id, "URL:", `/equipements/${id}/`)
+    api.delete(`/equipements/${id}/`)
+      .then((res) => {
+        console.log("Delete response:", res.status, res.data)
+        toast.success("Équipement supprimé.")
+        setEquipements(eq => eq.filter(x => x.idEquipement !== id))
+      })
+      .catch((err) => {
+        console.error("Delete error:", err.response?.status, err.response?.data, err)
+        toast.error("Impossible de supprimer cet équipement.")
+      })
+  }
+
   const sf = (field, val) => setSiteForm(p => ({ ...p, [field]: val }))
   const uf = (field, val) => setUserForm(p => ({ ...p, [field]: val }))
   const ef = (field, val) => setEqForm(p => ({ ...p, [field]: val }))
@@ -467,14 +482,15 @@ export default function Settings() {
               <div className="st-table-wrap">
                 {loadingEq ? <p className="st-empty">Chargement...</p> : equipements.length===0 ? <p className="st-empty">Aucun équipement enregistré dans le catalogue.</p> : (
                   <table className="st-table">
-                    <thead><tr><th>ID</th><th>NOM / MARQUE</th><th>N° DE SÉRIE</th><th>QUANTITÉ DÉFAUT</th><th>VALEUR UNITAIRE (DZD)</th></tr></thead>
+                    <thead><tr><th>ID</th><th>NOM / MARQUE</th><th>N° DE SÉRIE</th><th>QUANTITÉ DÉFAUT</th><th>VALEUR UNITAIRE (DZD)</th><th></th></tr></thead>
                     <tbody>{equipements.map(eq=>(
-                      <tr key={eq.id}>
-                        <td style={{color:'#64748b'}}>#{eq.id}</td>
+                      <tr key={eq.idEquipement}>
+                        <td style={{color:'#64748b'}}>#{eq.idEquipement}</td>
                         <td style={{fontWeight:600}}>{eq.nomMarque}</td>
                         <td>{eq.numeroSerie || '—'}</td>
                         <td>{eq.quantiteImpactee}</td>
                         <td>{eq.valeurComptable ? parseFloat(eq.valeurComptable).toLocaleString('fr-FR') : 'Non définie'}</td>
+                        <td><button className="st-del-btn" onClick={()=>handleDeleteEquipement(eq.idEquipement)} title="Supprimer">✕</button></td>
                       </tr>
                     ))}</tbody>
                   </table>
