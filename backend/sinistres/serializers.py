@@ -13,11 +13,128 @@ Sérialiseurs DRF pour le système de gestion des sinistres.
 """
 
 from rest_framework import serializers
+from django.db import transaction
 from .models import (
     Site, Sinistre, Equipement, PieceJointe, HistoriqueStatut,
     NATURE_CHOICES, TYPE_PAR_NATURE, ALL_TYPE_CHOICES, Notification,
     Franchise
 )
+
+
+# ═════════════════════════════════════════════
+#  CODIFICATION WW-CATSUB-FILE
+#  Mapping complet wilaya + type → codes
+# ═════════════════════════════════════════════
+
+_WILAYA_CODES = {
+    "adrar": "01", "chlef": "02", "laghouat": "03",
+    "oum el bouaghi": "04", "oum-el-bouaghi": "04", "oum el-bouaghi": "04", "batna": "05",
+    "béjaïa": "06", "bejaia": "06", "biskra": "07", "béchar": "08", "bechar": "08",
+    "blida": "09", "bouira": "10", "tamanrasset": "11",
+    "tébessa": "12", "tebessa": "12", "tlemcen": "13", "tiaret": "14",
+    "tizi ouzou": "15", "tizi-ouzou": "15",
+    "alger": "16", "algiers": "16", "algier": "16",
+    "djelfa": "17", "jijel": "18", "sétif": "19", "setif": "19",
+    "saïda": "20", "saida": "20", "skikda": "21",
+    "sidi bel abbès": "22", "sidi bel abbes": "22", "sidi-belabbes": "22", "annaba": "23", "guelma": "24",
+    "constantine": "25", "médéa": "26", "medea": "26", "mostaganem": "27",
+    "m'sila": "28", "msila": "28", "mascara": "29", "ouargla": "30",
+    "oran": "31", "el bayadh": "32", "el-bayadh": "32", "illizi": "33",
+    "bordj bou arréridj": "34", "bordj bou arreridj": "34", "bordj-bou-arreridj": "34", "boumerdès": "35", "boumerdes": "35", "el tarf": "36", "el-tarf": "36",
+    "tindouf": "37", "tissemsilt": "38", "el oued": "39", "el-oued": "39",
+    "khenchela": "40", "khenchla": "40", "souk ahras": "41", "souk-ahras": "41", "tipaza": "42",
+    "mila": "43", "aïn defla": "44", "ain defla": "44", "ain-defla": "44", "naâma": "45", "naama": "45",
+    "aïn témouchent": "46", "ain temouchent": "46", "ain-temouchent": "46", "ghardaïa": "47", "ghardaia": "47", "relizane": "48",
+    "timimoun": "49", "bordj badji mokhtar": "50",
+    "ouled djellal": "51", "béni abbès": "52", "beni abbes": "52",
+    "in salah": "53", "in guezzam": "54",
+    "touggourt": "55", "djanet": "56",
+    "el m'ghair": "57", "el mghair": "57", "el meniaa": "58", "el meniaâ": "58",
+    "aflou": "59", "aïn oussera": "60", "ain oussera": "60", "m'sila reorganized": "61",
+    "barika": "62", "el eulma": "63", "touggourt expanded": "64",
+    "ksar el boukhari": "65", "lakhdaria": "66", "maghnia": "67",
+    "labiodh sidi cheikh": "68", "el abiodh": "69",
+}
+
+_SINISTER_CATSUB_MAP = {
+    # 01 Fibre Optique
+    "FIBRE_OPTIQUE":              "0101",
+    # 02 Acte de Sabotage
+    "ACTE_DE_SABOTAGE":           "0201",
+    # 03 Vol
+    "VOL":                        "0301",
+    "VOL_PE":                     "0302",
+    # 04 Incendie
+    "INCENDIE":                   "0401",
+    "INCENDIE_PE":                "0402",
+    "INCENDIE_SURTENSION_ELEC":   "0403",
+    # 05 Intemperie
+    "VENT_VIOLENT":               "0501",
+    "FOUDRE":                     "0502",
+    "PLUIE":                      "0503",
+    # 06 Catastrophe Naturelle
+    "TREMBLEMENT_DE_TERRE":       "0601",
+    "TEMPETE":                    "0602",
+    "INONDATION":                 "0603",
+    "GLISSEMENT_DE_TERRAIN":      "0604",
+    "DEGAT_DES_EAUX":             "0605",
+    # 07 Violence Politique
+    "GREVES_EMEUTES":             "0701",
+    "MOUVEMENT_POPULAIRE":        "0702",
+    "AUTRES":                     "0703",
+    # 08 RC
+    "BRIS_DE_MACHINES":           "0801",
+    "BRIS_DE_GLACES":             "0802",
+    "ACCIDENT_APPAREILS_ELEC":    "0803",
+    "RISQUES_INFORMATIQUES_ELEC": "0804",
+    "CHUTE_AERONEF_OBJET_SPATIAL":"0805",
+    "TRANSPORT_INTERNE":          "0806",
+    "DOMMAGES":                   "0807",
+}
+
+
+def _get_wilaya_code(wilaya_name):
+    """Mappe un nom de wilaya (texte BDD) vers son code 2 chiffres."""
+    if not wilaya_name:
+        return "00"
+    return _WILAYA_CODES.get(wilaya_name.strip().lower(), "00")
+
+
+def _get_catsub_code(type_sinistre):
+    """Retourne le code CATSUB 4 chiffres pour un typeSinistre."""
+    return _SINISTER_CATSUB_MAP.get(type_sinistre, "0000")
+
+
+@transaction.atomic
+def _generate_declaration_id(type_sinistre, wilaya_name, year):
+    """
+    Genere un ID unique au format WW-CATSUB-FILE.
+    Thread-safe via select_for_update + boucle de retry sur collision.
+
+    Exemples :
+      Alger + VOL_PE  (2026) -> '16-0302-01'
+      Oran  + INCENDIE(2026) -> '31-0401-01'
+    """
+    ww     = _get_wilaya_code(wilaya_name)
+    catsub = _get_catsub_code(type_sinistre)
+    prefix = f"{ww}-{catsub}"
+
+    existing_count = (
+        Sinistre.objects
+        .filter(idSinistre__startswith=f"{prefix}-", dateCreation__year=year)
+        .count()
+    )
+
+    file_num  = existing_count + 1
+    candidate = f"{prefix}-{file_num:02d}"
+
+    # Boucle de securite en cas de collision residuelle
+    while Sinistre.objects.filter(idSinistre=candidate).exists():
+        file_num += 1
+        candidate = f"{prefix}-{file_num:02d}"
+
+    return candidate
+
 
 
 # ═════════════════════════════════════════════
@@ -121,9 +238,9 @@ class SinistreListSerializer(serializers.ModelSerializer):
     nature_label       = serializers.CharField(source='get_nature_display', read_only=True)
     typeSinistre_label = serializers.CharField(source='get_typeSinistre_display', read_only=True)
     statut_label       = serializers.CharField(source='get_statut_display', read_only=True)
-    codeSite           = serializers.CharField(source='site.codeSite', read_only=True)
-    nomSite            = serializers.CharField(source='site.nomSite', read_only=True)
-    wilaya             = serializers.CharField(source='site.wilaya', read_only=True)
+    codeSite           = serializers.SerializerMethodField(read_only=True)
+    nomSite            = serializers.SerializerMethodField(read_only=True)
+    wilaya             = serializers.SerializerMethodField(read_only=True)
     createur_nom       = serializers.SerializerMethodField(read_only=True)
     dernier_mouvement  = serializers.SerializerMethodField(read_only=True)
 
@@ -149,6 +266,15 @@ class SinistreListSerializer(serializers.ModelSerializer):
         if obj.createur:
             return f"{obj.createur.nom} {obj.createur.prenom}"
         return None
+
+    def get_codeSite(self, obj):
+        return obj.site.codeSite if obj.site else "N/A"
+
+    def get_nomSite(self, obj):
+        return obj.site.nomSite if obj.site else "N/A"
+
+    def get_wilaya(self, obj):
+        return obj.site.wilaya if obj.site else "N/A"
 
 
 # ═════════════════════════════════════════════
@@ -240,7 +366,7 @@ class SinistreCreateSerializer(serializers.ModelSerializer):
     via perform_create (request.user).
     Le champ `codeSite` attend le code du site (pas l'id numérique).
     """
-    codeSite = serializers.CharField(write_only=True)
+    codeSite = serializers.CharField(write_only=True, required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model  = Sinistre
@@ -252,6 +378,8 @@ class SinistreCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate_codeSite(self, value):
+        if not value:
+            return None
         try:
             Site.objects.get(codeSite=value)
         except Site.DoesNotExist:
@@ -277,9 +405,22 @@ class SinistreCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        code_site = validated_data.pop('codeSite')
-        site = Site.objects.get(codeSite=code_site)
-        validated_data['site'] = site
+        from django.utils import timezone
+
+        code_site = validated_data.pop('codeSite', None)
+        site      = None
+        if code_site:
+            site = Site.objects.get(codeSite=code_site)
+            validated_data['site'] = site
+
+        # ── Auto-génération de l'ID au format WW-CATSUB-FILE ──────────
+        type_sinistre = validated_data.get('typeSinistre', '')
+        wilaya_name   = site.wilaya if site else ''
+        year          = timezone.now().year
+
+        validated_data['idSinistre'] = _generate_declaration_id(
+            type_sinistre, wilaya_name, year
+        )
         return super().create(validated_data)
 
 

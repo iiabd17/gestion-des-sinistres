@@ -404,6 +404,10 @@ class SinistreListCreateView(APIView):
         nature_filter = request.query_params.get('nature')
         if statut_filter:
             sinistres = sinistres.filter(statut=statut_filter)
+        else:
+            # Par défaut, on cache les dossiers archivés de la liste générale
+            sinistres = sinistres.exclude(statut='ARCHIVE')
+
         if nature_filter:
             sinistres = sinistres.filter(nature=nature_filter)
 
@@ -438,20 +442,22 @@ class SinistreListCreateView(APIView):
             lien = f"/declarations/completer/{sinistre.idSinistre}"
             
             # CRITICAL ZONE ALERT: 3 claims in the current month
-            from datetime import date
-            current_month = date.today().month
-            current_year = date.today().year
-            claims_this_month = Sinistre.objects.filter(
-                site=sinistre.site,
-                dateCreation__year=current_year,
-                dateCreation__month=current_month
-            ).count()
+            claims_this_month = 0
+            if sinistre.site:
+                from datetime import date
+                current_month = date.today().month
+                current_year = date.today().year
+                claims_this_month = Sinistre.objects.filter(
+                    site=sinistre.site,
+                    dateCreation__year=current_year,
+                    dateCreation__month=current_month
+                ).count()
 
             from accounts.models import Assurance, Ingenieur, Legal
             directeurs_assurance = Assurance.objects.filter(role=Assurance.RoleAssurance.DIRECTRICE)
             ingenieurs = Ingenieur.objects.all()
 
-            if claims_this_month >= 3:
+            if sinistre.site and claims_this_month >= 3:
                 alert_msg = f"ALERTE CRITIQUE: Le site {sinistre.site.codeSite} a enregistré {claims_this_month} sinistres ce mois-ci."
                 _create_notification(directeurs_assurance, alert_msg, lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
                 _create_notification(ingenieurs, alert_msg, lien, expediteur=request.user, sinistre_id=sinistre.idSinistre)
@@ -1067,10 +1073,9 @@ class SinistreCloturerView(APIView):
     def post(self, request, pk):
         sinistre = get_object_or_404(Sinistre, pk=pk)
 
-        if sinistre.statut not in ('TRANSMIS_ASSUREUR', 'REJETE'):
+        if sinistre.statut not in ('TRANSMIS_ASSUREUR', 'REJETE', 'VALIDE', 'EN_VALIDATION_LEGAL', 'EN_VALIDATION_HSE'):
             return Response(
-                {'error': f"Seuls les sinistres Transmis ou Rejetés peuvent être clôturés. "
-                          f"Statut actuel : {sinistre.get_statut_display()}."},
+                {'error': f"Le dossier ne peut pas être clôturé dans son statut actuel ({sinistre.get_statut_display()})."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

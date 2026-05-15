@@ -171,7 +171,9 @@ class Sinistre(models.Model):
         Site,
         on_delete=models.PROTECT,
         related_name='sinistres',
-        db_column='codeSite'
+        db_column='codeSite',
+        null=True,
+        blank=True
     )
     createur = models.ForeignKey(
         settings.AUTH_USER_MODEL,
