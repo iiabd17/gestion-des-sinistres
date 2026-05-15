@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import api from '../../api';
 import './StatistiquesDelais.css';
+import TimelineBarChart from '../../components/ClaimTimeline/TimelineBarChart';
 
 const STATUT_OPTIONS = [
   { value: 'OUVERT', label: 'Ouvert' },
@@ -88,6 +89,19 @@ export default function StatistiquesDelaisPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [timelineModal, setTimelineModal] = useState({ isOpen: false, data: null, loading: false });
+  const [timeUnit, setTimeUnit] = useState('heures');
+
+  const handleViewTimeline = async (idSinistre) => {
+    setTimelineModal({ isOpen: true, data: null, loading: true });
+    try {
+      const res = await api.get(`/sinistres/${idSinistre}/`);
+      setTimelineModal({ isOpen: true, data: res.data, loading: false });
+    } catch (err) {
+      console.error("Erreur lors de la récupération de l'historique", err);
+      setTimelineModal({ isOpen: false, data: null, loading: false });
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -292,6 +306,7 @@ export default function StatistiquesDelaisPage() {
                       <th>DATE ENTRÉE</th>
                       <th>DATE SORTIE</th>
                       <th>STATUT</th>
+                      <th style={{ width: 60, textAlign: 'center' }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -311,6 +326,16 @@ export default function StatistiquesDelaisPage() {
                             {d.en_cours ? 'En cours' : 'Terminé'}
                           </span>
                         </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button 
+                            className="sd-icon-btn" 
+                            style={{ width: 32, height: 32, margin: '0 auto' }}
+                            title="Voir la timeline du workflow"
+                            onClick={() => handleViewTimeline(d.idSinistre)}
+                          >
+                            <IconEye />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -322,6 +347,81 @@ export default function StatistiquesDelaisPage() {
               <div className="sd-empty-icon"><IconEmpty /></div>
               <h3>Aucune donnée trouvée</h3>
               <p>Aucun historique de sinistre trouvé pour l'étape <strong>{selectedLabel}</strong> durant la période sélectionnée.</p>
+            </div>
+          )}
+
+          {/* Modal Timeline */}
+          {timelineModal.isOpen && (
+            <div className="sd-modal-overlay" onClick={() => setTimelineModal({ isOpen: false, data: null, loading: false })}>
+              <div className="sd-modal" onClick={e => e.stopPropagation()}>
+                <div className="sd-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <h3 style={{ margin: 0 }}>Timeline du Dossier #{timelineModal.data?.idSinistre || '...'}</h3>
+                    <select 
+                      className="sd-select" 
+                      style={{ padding: '4px 8px', fontSize: 13, height: 'auto', minWidth: 100 }}
+                      value={timeUnit} 
+                      onChange={e => setTimeUnit(e.target.value)}
+                    >
+                      <option value="minutes">Minutes</option>
+                      <option value="heures">Heures</option>
+                      <option value="jours">Jours</option>
+                    </select>
+                  </div>
+                  <button className="sd-modal-close" onClick={() => setTimelineModal({ isOpen: false, data: null, loading: false })}>&times;</button>
+                </div>
+                
+                <div className="sd-modal-body">
+                  {timelineModal.loading ? (
+                    <div style={{ textAlign: 'center', padding: 40 }}><div className="sd-spinner" style={{ margin: '0 auto' }} /></div>
+                  ) : timelineModal.data ? (
+                    <div className="sd-timeline-list" style={{ marginTop: 20 }}>
+                      {(() => {
+                        const hist = timelineModal.data.historiqueStatuts || [];
+                        if (hist.length === 0) return <p>Aucun historique.</p>;
+                        
+                        // Sort chronologically (oldest first) so that timeline goes left to right properly
+                        const sortedHist = [...hist].sort((a, b) => new Date(a.dateChangement) - new Date(b.dateChangement));
+                        
+                        const chartData = sortedHist.map((h, i) => {
+                          const startDate = new Date(h.dateChangement);
+                          let endDate = new Date(); // now
+                          if (i < sortedHist.length - 1) {
+                             endDate = new Date(sortedHist[i+1].dateChangement);
+                          } else if (['CLOTURE', 'ARCHIVE', 'CLOTURE_SOUS_FRANCHISE'].includes(h.nouveauStatut)) {
+                             endDate = startDate;
+                          }
+                          
+                          const diffMs = endDate - startDate;
+                          // Prevent negative hours just in case of weird same-second anomalies
+                          const diffMsNonNegative = Math.max(0, diffMs);
+                          let diffVal = 0;
+                          
+                          if (timeUnit === 'minutes') {
+                             diffVal = Number((diffMsNonNegative / (1000 * 60)).toFixed(2));
+                          } else if (timeUnit === 'heures') {
+                             diffVal = Number((diffMsNonNegative / (1000 * 60 * 60)).toFixed(2));
+                          } else if (timeUnit === 'jours') {
+                             diffVal = Number((diffMsNonNegative / (1000 * 60 * 60 * 24)).toFixed(2));
+                          }
+                          
+                          const isLast = i === sortedHist.length - 1;
+                          
+                          return {
+                            statut: h.nouveauStatut_label || h.nouveauStatut,
+                            valeur: diffVal,
+                            en_cours: isLast && diffMs > 0
+                          };
+                        });
+
+                        return <TimelineBarChart data={chartData} unit={timeUnit} />;
+                      })()}
+                    </div>
+                  ) : (
+                    <p style={{ textAlign: 'center', color: '#dc2626' }}>Erreur lors du chargement des données.</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </main>
@@ -362,4 +462,8 @@ function IconSearch() {
 }
 function IconEmpty() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{width:48,height:48}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+}
+
+function IconEye() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16,height:16}}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
 }
