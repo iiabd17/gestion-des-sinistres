@@ -168,11 +168,7 @@ export default function NewDeclaration() {
         natureVal = natureMap[category.nature] || category.nature;
       }
 
-      // Génération d'un ID unique pour le sinistre
-      const idSinistre = `SIN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
       const payload = {
-        idSinistre: idSinistre,
         nature: natureVal,
         typeSinistre: type,
         dateSurvenance: date,
@@ -182,15 +178,16 @@ export default function NewDeclaration() {
         urgence: 1 // Par défaut
       };
 
-      // 1. Créer le sinistre
-      await api.post('/sinistres/', payload);
+      // 1. Créer le sinistre — le backend génère l'ID automatiquement
+      const createRes = await api.post('/sinistres/', payload);
+      const realId = createRes.data.idSinistre;
 
       // 2. Uploader les fichiers si présents
       if (files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const formData = new FormData();
-          formData.append('sinistre', idSinistre);
+          formData.append('sinistre', realId);
           formData.append('titreDoc', file.name);
           formData.append('fichier', file);
 

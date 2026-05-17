@@ -376,6 +376,9 @@ class SinistreCreateSerializer(serializers.ModelSerializer):
             'descriptionDetailliee', 'montantEstime',
             'urgence', 'codeSite',
         ]
+        extra_kwargs = {
+            'idSinistre': {'required': False},
+        }
 
     def validate_codeSite(self, value):
         if not value:

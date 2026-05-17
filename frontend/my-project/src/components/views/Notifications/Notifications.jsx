@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../../api';
+import { AuthContext } from '../../../context/AuthContext';
 import './Notifications.css';
 
 const NATURE_OPTIONS = [
@@ -18,6 +19,7 @@ const NATURE_OPTIONS = [
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const { setUnreadNotifsCount } = useContext(AuthContext);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,7 +45,10 @@ export default function Notifications() {
   const handleNotificationClick = (notif) => {
     if (!notif.is_read) {
       api.post(`/notifications/${notif.id}/read/`)
-        .then(() => setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n)))
+        .then(() => {
+          setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+          setUnreadNotifsCount(prev => Math.max(0, prev - 1));
+        })
         .catch(err => console.error("Erreur marquage notification", err));
     }
     if (notif.lien_action) navigate(notif.lien_action);

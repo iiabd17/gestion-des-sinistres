@@ -70,7 +70,13 @@ export default function DossierGestionDetail() {
           toast.error(err.response?.data?.error || 'Erreur lors de la validation HSE')
         }
       }
-    } catch { toast.error("Erreur lors de l'ajout") }
+    } catch (err) {
+      console.error("Upload error:", err.response?.status, err.response?.data)
+      const detail = err.response?.data
+        ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data))
+        : ''
+      toast.error(`Erreur lors de l'ajout${detail ? ': ' + detail : ''}`)
+    }
   }
 
   const handleStatutChange = async (e) => {

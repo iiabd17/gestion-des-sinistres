@@ -85,7 +85,7 @@ function CustomSelect({ value, onChange, options }) {
 export default function StatistiquesDelaisPage() {
   const [selectedStatut, setSelectedStatut] = useState('EN_EXPERTISE');
   const [periode, setPeriode] = useState('tout');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortOrder, setSortOrder] = useState('date_desc');
   const [searchTerm, setSearchTerm] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -116,7 +116,12 @@ export default function StatistiquesDelaisPage() {
   // Apply client-side sort & search
   const filteredDetails = (data?.details || [])
     .filter(d => searchTerm ? d.idSinistre?.toLowerCase().includes(searchTerm.toLowerCase()) : true)
-    .sort((a, b) => sortOrder === 'desc' ? b.duree_heures - a.duree_heures : a.duree_heures - b.duree_heures);
+    .sort((a, b) => {
+      if (sortOrder === 'date_desc') return new Date(b.date_entree || 0) - new Date(a.date_entree || 0);
+      if (sortOrder === 'date_asc')  return new Date(a.date_entree || 0) - new Date(b.date_entree || 0);
+      if (sortOrder === 'desc')      return b.duree_heures - a.duree_heures;
+      return a.duree_heures - b.duree_heures;
+    });
 
   return (
     <div className="sd-page-content">
@@ -175,8 +180,10 @@ export default function StatistiquesDelaisPage() {
                     value={sortOrder}
                     onChange={setSortOrder}
                     options={[
-                      { value: 'desc', label: 'Plus long → court' },
-                      { value: 'asc', label: 'Plus court → long' }
+                      { value: 'date_desc', label: 'Plus récent → ancien' },
+                      { value: 'date_asc',  label: 'Plus ancien → récent' },
+                      { value: 'desc',      label: 'Plus long → court' },
+                      { value: 'asc',       label: 'Plus court → long' }
                     ]}
                   />
                 </div>
