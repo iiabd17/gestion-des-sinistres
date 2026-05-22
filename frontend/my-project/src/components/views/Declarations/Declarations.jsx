@@ -18,6 +18,7 @@ const statutBadge = {
   'VALIDE':                { bg: '#d1fae5', color: '#065f46', label: 'VALIDÉ' },
   'REJETE':                { bg: '#fee2e2', color: '#b91c1c', label: 'REJETÉ' },
   'CLOTURE':               { bg: '#e2e8f0', color: '#475569', label: 'CLÔTURÉ' },
+  'CLOTURE_SOUS_FRANCHISE':{ bg: '#e2e8f0', color: '#475569', label: 'CLÔTURÉ (FRANCHISE)' },
   'ARCHIVE':               { bg: '#f1f5f9', color: '#64748b', label: 'ARCHIVÉ' },
 }
 
@@ -27,7 +28,13 @@ export default function Declarations() {
   const { user, unreadNotifsCount } = useContext(AuthContext)
   const role = user?.role || ''
 
-  const [tab, setTab] = useState(location.state?.tab || 'completer')
+  const [tab, setTab] = useState(() => {
+    const initialTab = location.state?.tab || 'completer'
+    if (initialTab === 'valider' && !['ASSURANCE', 'ADMIN'].includes(role)) {
+      return 'completer'
+    }
+    return initialTab
+  })
 
   // Tab "À Compléter" data (sinistres OUVERT ou REJET_POUR_COMPLEMENT)
   const [dossiersCompleter, setDossiersCompleter] = useState([])
@@ -59,24 +66,38 @@ export default function Declarations() {
       .catch(() => {})
   }, [])
 
-  // Charger les dossiers à compléter
+  // Charger les dossiers à compléter (ou TOUS les dossiers pour Équipe Terrain)
   useEffect(() => {
     setLoadingCompleter(true)
-    // Sinistres ouverts OU rejetés pour complément
-    Promise.all([
-      api.get('/sinistres/?statut=OUVERT&page_size=50').catch(() => ({ data: { results: [] } })),
-      api.get('/sinistres/?statut=REJET_POUR_COMPLEMENT&page_size=50').catch(() => ({ data: { results: [] } })),
-    ]).then(([openRes, rejectRes]) => {
-      const open = openRes.data?.results || openRes.data || []
-      const rejected = rejectRes.data?.results || rejectRes.data || []
-      const combined = [...open, ...rejected]
-      setDossiersCompleter(combined)
-      
-      // Extract unique wilayas
-      const w = [...new Set(combined.map(d => d.wilaya))].filter(Boolean).sort()
-      setWilayas(prev => [...new Set([...prev, ...w])])
-    }).finally(() => setLoadingCompleter(false))
-  }, [])
+
+    if (role === 'EQUIPE_TERRAIN') {
+      // Équipe Terrain voit TOUTES ses déclarations (le backend filtre déjà par createur=user)
+      api.get('/sinistres/?page_size=100')
+        .catch(() => ({ data: { results: [] } }))
+        .then((res) => {
+          const all = res.data?.results || res.data || []
+          setDossiersCompleter(all)
+          const w = [...new Set(all.map(d => d.wilaya))].filter(Boolean).sort()
+          setWilayas(prev => [...new Set([...prev, ...w])])
+        })
+        .finally(() => setLoadingCompleter(false))
+    } else {
+      // Autres rôles : Sinistres ouverts OU rejetés pour complément
+      Promise.all([
+        api.get('/sinistres/?statut=OUVERT&page_size=50').catch(() => ({ data: { results: [] } })),
+        api.get('/sinistres/?statut=REJET_POUR_COMPLEMENT&page_size=50').catch(() => ({ data: { results: [] } })),
+      ]).then(([openRes, rejectRes]) => {
+        const open = openRes.data?.results || openRes.data || []
+        const rejected = rejectRes.data?.results || rejectRes.data || []
+        const combined = [...open, ...rejected]
+        setDossiersCompleter(combined)
+        
+        // Extract unique wilayas
+        const w = [...new Set(combined.map(d => d.wilaya))].filter(Boolean).sort()
+        setWilayas(prev => [...new Set([...prev, ...w])])
+      }).finally(() => setLoadingCompleter(false))
+    }
+  }, [role])
 
   // Charger les dossiers à valider
   useEffect(() => {
@@ -361,7 +382,7 @@ export default function Declarations() {
           {/* ══════════════════════════════════════════
               TAB 2 – À VALIDER
           ══════════════════════════════════════════ */}
-          {tab === 'valider' && (
+          {tab === 'valider' && ['ASSURANCE', 'ADMIN'].includes(role) && (
             <div className="dcl-val-container">
               <div className="dcl-val-head">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

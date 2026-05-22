@@ -20,7 +20,7 @@ const NATURE_STYLES = {
   'RC':                  { bg: '#d1fae5', color: '#065f46' },
 }
 
-const EMPTY_EQUIP = { nomMarque: '', quantiteImpactee: 1, valeurComptable: 0 }
+const EMPTY_EQUIP = { nomMarque: '', quantiteImpactee: 1, valeurComptable: '' }
 
 export default function DossierCompleterDetail() {
   const { id } = useParams()
@@ -58,8 +58,8 @@ export default function DossierCompleterDetail() {
       const res = await api.post('/equipements/', {
         idEquipement: `EQ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         nomMarque: newEquip.nomMarque,
-        quantiteImpactee: newEquip.quantiteImpactee,
-        valeurComptable: newEquip.valeurComptable,
+        quantiteImpactee: newEquip.quantiteImpactee || 1,
+        valeurComptable: newEquip.valeurComptable || 0,
         sinistre: id,
       })
       setData(prev => ({ ...prev, equipements: [...(prev.equipements || []), res.data] }))
@@ -97,7 +97,7 @@ export default function DossierCompleterDetail() {
       }))
       setRefAvgValue(option.avgValue)
     } else {
-      setNewEquip(prev => ({ ...prev, nomMarque: '', valeurComptable: 0 }))
+      setNewEquip(prev => ({ ...prev, nomMarque: '', valeurComptable: '' }))
       setRefAvgValue(null)
     }
   }
@@ -367,8 +367,8 @@ export default function DossierCompleterDetail() {
                           type="number"
                           className="dcd-form-input"
                           min="1"
-                          value={newEquip.quantiteImpactee}
-                          onChange={e => setNewEquip(prev => ({ ...prev, quantiteImpactee: parseInt(e.target.value) || 1 }))}
+                          value={newEquip.quantiteImpactee === '' ? '' : newEquip.quantiteImpactee}
+                          onChange={e => setNewEquip(prev => ({ ...prev, quantiteImpactee: e.target.value === '' ? '' : parseInt(e.target.value) }))}
                         />
                       </div>
                       <div className="dcd-form-field">
@@ -378,8 +378,8 @@ export default function DossierCompleterDetail() {
                           className="dcd-form-input"
                           min="0"
                           placeholder="0"
-                          value={newEquip.valeurComptable || ''}
-                          onChange={e => setNewEquip(prev => ({ ...prev, valeurComptable: parseFloat(e.target.value) || 0 }))}
+                          value={newEquip.valeurComptable === '' ? '' : newEquip.valeurComptable}
+                          onChange={e => setNewEquip(prev => ({ ...prev, valeurComptable: e.target.value === '' ? '' : parseFloat(e.target.value) }))}
                           style={valueWarning ? { borderColor: valueWarning.type === 'high' ? '#ef4444' : '#f59e0b' } : {}}
                         />
                         {valueWarning && (

@@ -280,7 +280,7 @@ export default function DossierGestionDetail() {
                     <IconArchive /> Archiver
                   </button>
                 )}
-                {user?.role !== 'EQUIPE_TERRAIN' && !['CLOTURE', 'CLOTURE_SOUS_FRANCHISE', 'ARCHIVE'].includes(data.statut) && (
+                {user?.role !== 'EQUIPE_TERRAIN' && !['CLOTURE', 'CLOTURE_SOUS_FRANCHISE', 'ARCHIVE'].includes(data.statut) && !(user?.role === 'HSE' && ['OUVERT', 'EN_EXPERTISE', 'REJET_POUR_COMPLEMENT'].includes(data.statut)) && (
                   <button className="dgd-btn-secondary" onClick={() => setIsEditing(!isEditing)}>
                     <IconEdit /> {isEditing ? 'Terminer' : 'Modifier'}
                   </button>
@@ -518,7 +518,7 @@ export default function DossierGestionDetail() {
                 <div className="dv-card-title-row dv-card-title-row--between">
                   <h2 className="dv-card-title">Pièces Jointes</h2>
                   <div className="dv-files-count" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {isEditing && <button onClick={() => fileInputRef.current?.click()} className="dcd-add-btn">+ Ajouter</button>}
+                    {isEditing && !(user?.role === 'HSE' && ['OUVERT', 'EN_EXPERTISE', 'REJET_POUR_COMPLEMENT'].includes(data.statut)) && <button onClick={() => fileInputRef.current?.click()} className="dcd-add-btn">+ Ajouter</button>}
                     <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} />
                     <span className="dv-files-count"><IconFolder />{pieces.length} Fichier{pieces.length !== 1 ? 's' : ''}</span>
                   </div>

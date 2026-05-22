@@ -59,18 +59,23 @@ export default function DossierValidation() {
   const handleValider = useCallback(async () => {
     setSubmitting(true)
     try {
-      await api.post(`/sinistres/${id}/validation/`, {
-        action: 'VALIDER',
-        commentaire: 'Dossier validé et transmis pour traitement.',
-      })
-      toast.success('Dossier validé et transmis à la gestion des dossiers')
+      if (data?.statut === 'ATTENTE_VALIDATION_FRANCHISE') {
+        await api.post(`/sinistres/${id}/validation-franchise/`)
+        toast.success('Dossier clôturé sous franchise avec succès')
+      } else {
+        await api.post(`/sinistres/${id}/validation/`, {
+          action: 'VALIDER',
+          commentaire: 'Dossier validé et transmis pour traitement.',
+        })
+        toast.success('Dossier validé et transmis à la gestion des dossiers')
+      }
       navigate('/gestion')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Erreur lors de la validation')
     } finally {
       setSubmitting(false)
     }
-  }, [id, navigate])
+  }, [id, navigate, data])
 
   // Send back to compléter (OUVERT) and notify ingénieur
   const handleInfoManquante = useCallback(async () => {
@@ -386,7 +391,7 @@ export default function DossierValidation() {
             <button className="dv-validate-btn" onClick={handleValider} disabled={submitting}
               style={{ opacity: submitting ? 0.7 : 1 }}>
               <IconCheck />
-              {submitting ? 'Traitement...' : 'Valider le Dossier'}
+              {submitting ? 'Traitement...' : (data?.statut === 'ATTENTE_VALIDATION_FRANCHISE' ? 'Valider la Clôture' : 'Valider le Dossier')}
             </button>
           </div>
         </main>
