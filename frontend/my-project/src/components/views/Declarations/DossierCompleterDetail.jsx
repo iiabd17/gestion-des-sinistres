@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useContext } from 'react'
+import { useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import AsyncSelect from 'react-select/async'
@@ -26,6 +26,7 @@ export default function DossierCompleterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user, unreadNotifsCount } = useContext(AuthContext)
+  const fileInputRef = useRef(null)
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -131,6 +132,27 @@ export default function DossierCompleterDetail() {
     }
   }, [])
 
+  // ── File upload ──
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const formData = new FormData()
+    formData.append('fichier', file)
+    formData.append('titreDoc', file.name)
+    formData.append('typePiece', 'AUTRE')
+    try {
+      const res = await api.post(`/sinistres/${id}/pieces/`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      toast.success('Document ajouté')
+      setData(prev => ({ ...prev, piecesJointes: [...(prev.piecesJointes || []), res.data] }))
+    } catch (err) {
+      console.error("Upload error:", err.response?.status, err.response?.data)
+      const detail = err.response?.data
+        ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data))
+        : ''
+      toast.error(`Erreur lors de l'ajout${detail ? ': ' + detail : ''}`)
+    }
+  }
+
   // ── Computed values (derived from data) ──
   const equipements = data?.equipements || []
   const pieces = data?.piecesJointes || []
@@ -185,7 +207,7 @@ export default function DossierCompleterDetail() {
   const declarant = data.createur_detail || {}
   const site = data.site_detail || {}
   // Ingénieur can only edit while dossier is still in expertise phase
-  const canEdit = data.statut === 'EN_EXPERTISE'
+  const canEdit = ['OUVERT', 'EN_EXPERTISE', 'REJET_POUR_COMPLEMENT'].includes(data.statut)
   const gpsText = (site.latitude && site.longitude)
     ? `${site.latitude.toFixed(4)}° N, ${site.longitude.toFixed(4)}° E`
     : 'Non disponible'
@@ -452,10 +474,16 @@ export default function DossierCompleterDetail() {
               <section className="dv-card">
                 <div className="dv-card-title-row dv-card-title-row--between">
                   <h2 className="dv-card-title">Pièces Jointes</h2>
-                  <span className="dv-files-count">
-                    <IconFolder />
-                    {pieces.length} Fichier{pieces.length !== 1 ? 's' : ''}
-                  </span>
+                  <div className="dv-files-count" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {canEdit && (
+                      <button className="dcd-add-btn" onClick={() => fileInputRef.current?.click()}>+ Ajouter</button>
+                    )}
+                    <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} />
+                    <span className="dv-files-count">
+                      <IconFolder />
+                      {pieces.length} Fichier{pieces.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
                 </div>
                 <div className="dv-pj-grid">
                   {pieces.length === 0 ? (

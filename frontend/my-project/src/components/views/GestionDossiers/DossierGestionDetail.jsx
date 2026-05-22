@@ -288,7 +288,7 @@ export default function DossierGestionDetail() {
     if (['CLOTURE', 'CLOTURE_SOUS_FRANCHISE', 'ARCHIVE'].includes(data.statut)) return false;
     
     if (user?.role === 'INGENIEUR') {
-      return data.statut === 'EN_EXPERTISE' || data.statut === 'REJET_POUR_COMPLEMENT';
+      return ['OUVERT', 'EN_EXPERTISE', 'REJET_POUR_COMPLEMENT'].includes(data.statut);
     }
     if (user?.role === 'HSE') {
       return data.statut === 'EN_VALIDATION_HSE';
