@@ -240,7 +240,14 @@ export default function Settings() {
   }
 
   const sf = (field, val) => setSiteForm(p => ({ ...p, [field]: val }))
-  const uf = (field, val) => setUserForm(p => ({ ...p, [field]: val }))
+  const uf = (field, val) => {
+    if (field === 'tel') {
+      val = val.replace(/\D/g, '');
+      if (val.length > 0 && val[0] !== '0') val = '0' + val;
+      val = val.slice(0, 10);
+    }
+    setUserForm(p => ({ ...p, [field]: val }));
+  }
   const ef = (field, val) => setEqForm(p => ({ ...p, [field]: val }))
 
   return (
@@ -325,7 +332,7 @@ export default function Settings() {
                     <div className="st-field"><label>PRÉNOM *</label><input className="st-input" value={userForm.prenom} onChange={e=>uf('prenom',e.target.value)} required /></div>
                     <div className="st-field"><label>NOM D'UTILISATEUR *</label><input className="st-input" value={userForm.username} onChange={e=>uf('username',e.target.value)} required /></div>
                     <div className="st-field"><label>EMAIL PRO *</label><input className="st-input" type="email" placeholder="nom@djezzy.dz" value={userForm.email} onChange={e=>uf('email',e.target.value)} required /></div>
-                    <div className="st-field"><label>TÉLÉPHONE</label><input className="st-input" placeholder="05XXXXXXXX" value={userForm.tel} onChange={e=>uf('tel',e.target.value)} /></div>
+                    <div className="st-field"><label>TÉLÉPHONE</label><input className="st-input" placeholder="05XXXXXXXX" value={userForm.tel} onChange={e=>uf('tel',e.target.value)} minLength={10} maxLength={10} /></div>
                     <div className="st-field">
                       <label>MOT DE PASSE * <small style={{color:'#94a3b8'}}>(8–12 car., 1 chiffre min.)</small></label>
                       <input className="st-input" type="password" value={userForm.password} onChange={e=>uf('password',e.target.value)} required minLength={8} maxLength={12} />

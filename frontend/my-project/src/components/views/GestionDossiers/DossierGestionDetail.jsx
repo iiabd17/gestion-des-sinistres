@@ -156,13 +156,13 @@ export default function DossierGestionDetail() {
           const img = new Image(); img.crossOrigin = 'Anonymous';
           img.onload = () => resolve(img);
           img.onerror = reject;
-          img.src = '/logo.png';
+          img.src = '/djezzy-logo.png';
         });
         const c = document.createElement('canvas');
         c.width = logoImg.width; c.height = logoImg.height;
         c.getContext('2d').drawImage(logoImg, 0, 0);
         const logoData = c.toDataURL('image/png');
-        pdf.addImage(logoData, 'PNG', 160, 10, 35, 10);
+        pdf.addImage(logoData, 'PNG', 160, 10, 30, 30);
       } catch (e) {
         console.error("Erreur chargement logo", e);
       }
@@ -183,30 +183,77 @@ export default function DossierGestionDetail() {
       pdf.setFontSize(16); pdf.setTextColor(26, 32, 44)
       pdf.text("Informations de l'incident", 20, y); y += 10
       pdf.setFontSize(12); pdf.setTextColor(74, 85, 104)
+      
+      const cout = data.equipements?.length > 0 
+        ? data.equipements.reduce((s, e) => s + (parseFloat(e.valeurComptable) || 0) * (e.quantiteImpactee || 1), 0) 
+        : parseFloat(data.montantEstime || 0)
+
       const infos = [
         `Type : ${data.nature_label || ''}`,
         `Date : ${new Date(data.dateSurvenance).toLocaleDateString('fr-FR')}`,
         `Site : ${data.site_detail?.wilaya || ''} (${data.site_detail?.codeSite || ''})`,
-        `Coût estimé : ${parseFloat(data.montantEstime || 0).toLocaleString('fr-FR')} DZD`,
+        `Coût estimé : ${cout.toLocaleString('fr-FR')} DZD`,
         `Statut : ${data.statut_label || data.statut || ''}`,
       ]
       infos.forEach(info => { pdf.text(info, 20, y); y += 8 })
-      const imagePieces = (data.piecesJointes || []).filter(p => p.fichier && /\.(jpg|jpeg|png)$/i.test(p.fichier))
-      for (const piece of imagePieces) {
-        try {
-          const imgUrl = piece.fichier.startsWith('http') ? piece.fichier : `http://localhost:8000${piece.fichier}`
-          const imgData = await new Promise((resolve, reject) => {
-            const img = new Image(); img.crossOrigin = 'Anonymous'
-            img.onload = () => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); resolve(c.toDataURL('image/jpeg', 0.8)) }
-            img.onerror = reject; img.src = imgUrl
-          })
-          if (y + 90 > 280) { pdf.addPage(); y = 20 }
-          pdf.addImage(imgData, 'JPEG', 20, y, 170, 80, undefined, 'FAST'); y += 90
-        } catch { }
+
+      const addSection = (title, items) => {
+        y += 5;
+        if (y > 270) { pdf.addPage(); y = 20; }
+        pdf.setFontSize(14); pdf.setTextColor(26, 32, 44);
+        pdf.text(title, 20, y); y += 8;
+        pdf.setFontSize(11); pdf.setTextColor(74, 85, 104);
+        items.forEach(item => {
+          if (!item) return;
+          const lines = pdf.splitTextToSize(item, 170);
+          lines.forEach(line => {
+            if (y > 280) { pdf.addPage(); y = 20; }
+            pdf.text(line, 20, y); y += 6;
+          });
+        });
+        y += 2;
+      };
+
+      const declarant = data.createur_detail || {};
+      addSection("Informations du Déclarant", [
+        `Nom complet : ${declarant.nom_complet || data.createur_nom || 'N/A'}`,
+        `Téléphone : ${declarant.tel || 'N/A'}`,
+        `Matricule / Emploi : ${declarant.matricule || declarant.username || 'N/A'}`,
+        `Département / Fonction : ${declarant.departement || declarant.fonction || 'N/A'}`
+      ]);
+
+      addSection("Détails Techniques", [
+        `Description : ${data.descriptionDetailliee || 'N/A'}`,
+        `Coordonnées GPS du site : ${data.site_detail?.latitude && data.site_detail?.longitude ? `${data.site_detail.latitude}° N, ${data.site_detail.longitude}° E` : 'Non disponible'}`,
+        `Heure de survenance : ${data.heureSurvenance ? data.heureSurvenance.substring(0, 5) : 'Non spécifiée'}`
+      ]);
+
+      if (data.equipements && data.equipements.length > 0) {
+        const eqList = data.equipements.map(e => `- ${e.nomMarque} (Qté: ${e.quantiteImpactee || 1}) : ${parseFloat(e.valeurComptable || 0).toLocaleString('fr-FR')} DZD`);
+        addSection("Équipements Sinistrés", eqList);
       }
+
+      if (data.numeroPV || data.observationsLegal) {
+        addSection("Service Légal", [
+          data.numeroPV ? `Numéro du PV de Police : ${data.numeroPV}` : '',
+          data.observationsLegal ? `Observations : ${data.observationsLegal}` : ''
+        ].filter(Boolean));
+      }
+
+      if (data.observationsHSE || data.mesuresCorrectives) {
+        addSection("Service HSE", [
+          data.observationsHSE ? `Observations HSE : ${data.observationsHSE}` : '',
+          data.mesuresCorrectives ? `Mesures Correctives : ${data.mesuresCorrectives}` : ''
+        ].filter(Boolean));
+      }
+
+      if (data.motifRejet) {
+        addSection("Commentaire Assurance / Rejet", [data.motifRejet]);
+      }
+
       pdf.save(`Dossier_${id}.pdf`)
-      toast.success('PDF téléchargé')
-    } catch { toast.error("Erreur PDF") }
+      toast.success('PDF téléchargé avec succès')
+    } catch { toast.error("Erreur lors de la génération du PDF") }
   }
 
   if (loading) return (
@@ -235,6 +282,22 @@ export default function DossierGestionDetail() {
   const cout = equipements.length > 0
     ? equipements.reduce((s, e) => s + (parseFloat(e.valeurComptable) || 0) * (e.quantiteImpactee || 1), 0)
     : parseFloat(data.montantEstime || 0)
+
+  const canModify = () => {
+    if (user?.role === 'EQUIPE_TERRAIN') return false;
+    if (['CLOTURE', 'CLOTURE_SOUS_FRANCHISE', 'ARCHIVE'].includes(data.statut)) return false;
+    
+    if (user?.role === 'INGENIEUR') {
+      return data.statut === 'EN_EXPERTISE' || data.statut === 'REJET_POUR_COMPLEMENT';
+    }
+    if (user?.role === 'HSE') {
+      return data.statut === 'EN_VALIDATION_HSE';
+    }
+    if (user?.role === 'LEGAL') {
+      return data.statut === 'EN_VALIDATION_LEGAL';
+    }
+    return true;
+  };
   return (
     <div className="dv-page-content">
       <div className="dv-main">
@@ -247,7 +310,7 @@ export default function DossierGestionDetail() {
               <span className="dv-eyebrow-id">#{data.idSinistre}</span>
             </div>
             <div className="dv-header-row">
-              <h1 className="dv-title">Validation du Dossier</h1>
+              <h1 className="dv-title">Dossier</h1>
               <div className="dv-chips">
                 <ChipItem label="SITE" value={siteLabel} />
                 <ChipItem label="DATE" value={dateLabel} />
@@ -280,7 +343,7 @@ export default function DossierGestionDetail() {
                     <IconArchive /> Archiver
                   </button>
                 )}
-                {user?.role !== 'EQUIPE_TERRAIN' && !['CLOTURE', 'CLOTURE_SOUS_FRANCHISE', 'ARCHIVE'].includes(data.statut) && !(user?.role === 'HSE' && ['OUVERT', 'EN_EXPERTISE', 'REJET_POUR_COMPLEMENT'].includes(data.statut)) && (
+                {canModify() && (
                   <button className="dgd-btn-secondary" onClick={() => setIsEditing(!isEditing)}>
                     <IconEdit /> {isEditing ? 'Terminer' : 'Modifier'}
                   </button>
@@ -325,7 +388,7 @@ export default function DossierGestionDetail() {
                 <h2 className="dv-card-title">Détails Techniques</h2>
                 <div className="dv-tech-grid">
                   <div className="dv-info-field">
-                    <span className="dv-info-label">DESCRIPTION DU SITE</span>
+                    <span className="dv-info-label">DESCRIPTION</span>
                     <p className="dv-info-desc">{data.descriptionDetailliee || 'Aucune description fournie.'}</p>
                   </div>
                   {data.nature === 'FIBRE_OPTIQUE' && (
@@ -335,7 +398,7 @@ export default function DossierGestionDetail() {
                     </div>
                   )}
                   <div className="dv-info-field">
-                    <span className="dv-info-label">COORDONNÉES GPS</span>
+                    <span className="dv-info-label">COORDONNÉES GPS DU SITE</span>
                     <div className="dv-gps-val"><IconPin />{gpsText}</div>
                   </div>
 
@@ -353,13 +416,6 @@ export default function DossierGestionDetail() {
                 </div>
               </section>
 
-              {/* Observations Ingénieur */}
-              {data.observationsIngenieur && user?.role !== 'EQUIPE_TERRAIN' && (
-                <section className="dv-card">
-                  <h2 className="dv-card-title">Observations Ingénieur</h2>
-                  <p className="dv-info-desc" style={{ marginTop: 8 }}>{data.observationsIngenieur}</p>
-                </section>
-              )}
 
               {/* Input Numéro PV Légal */}
               {data.statut === 'EN_VALIDATION_LEGAL' && (
@@ -518,7 +574,7 @@ export default function DossierGestionDetail() {
                 <div className="dv-card-title-row dv-card-title-row--between">
                   <h2 className="dv-card-title">Pièces Jointes</h2>
                   <div className="dv-files-count" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {isEditing && !(user?.role === 'HSE' && ['OUVERT', 'EN_EXPERTISE', 'REJET_POUR_COMPLEMENT'].includes(data.statut)) && <button onClick={() => fileInputRef.current?.click()} className="dcd-add-btn">+ Ajouter</button>}
+                    {isEditing && canModify() && <button onClick={() => fileInputRef.current?.click()} className="dcd-add-btn">+ Ajouter</button>}
                     <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} />
                     <span className="dv-files-count"><IconFolder />{pieces.length} Fichier{pieces.length !== 1 ? 's' : ''}</span>
                   </div>

@@ -36,7 +36,22 @@ export default function Profile() {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let { name, value } = e.target;
+    
+    if (name === 'tel') {
+      // Keep only digits
+      value = value.replace(/\D/g, '');
+      
+      // Force it to start with 0 if it has any characters
+      if (value.length > 0 && value[0] !== '0') {
+        value = '0' + value;
+      }
+      
+      // Limit to 10 digits
+      value = value.slice(0, 10);
+    }
+
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = (e) => {
@@ -112,6 +127,8 @@ export default function Profile() {
                       onChange={handleChange} 
                       placeholder="Ex: 05XXXXXXXX"
                       className="pr-input"
+                      minLength={10}
+                      maxLength={10}
                     />
                   </div>
                   

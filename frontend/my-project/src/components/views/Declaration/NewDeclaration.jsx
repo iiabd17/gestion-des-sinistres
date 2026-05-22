@@ -93,6 +93,11 @@ export default function NewDeclaration() {
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  // ── Date / time ceiling: cannot declare a future event ──
+  const todayStr = new Date().toISOString().slice(0, 10)           // 'YYYY-MM-DD'
+  const nowStr   = new Date().toTimeString().slice(0, 5)           // 'HH:MM'
+  const isToday  = date === todayStr
+
   // ── Autocomplete : charger les sites depuis l'API ──
   const loadSiteOptions = useCallback((inputValue) => {
     if (!inputValue || inputValue.length < 1) {
@@ -139,9 +144,20 @@ export default function NewDeclaration() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Validation basique (code/localisation est désormais optionnel)
-    if (!type || !date || !desc) {
+    // Validation basique
+    if (!type || !date || !time || !code || !desc) {
       toast.error('Veuillez remplir tous les champs obligatoires.');
+      return;
+    }
+
+    // Block future dates
+    if (date > todayStr) {
+      toast.error("La date de constatation ne peut pas être dans le futur.");
+      return;
+    }
+    // Block future time when date is today
+    if (date === todayStr && time && time > nowStr) {
+      toast.error("L'heure de constatation ne peut pas être dans le futur.");
       return;
     }
 
@@ -243,7 +259,7 @@ export default function NewDeclaration() {
 
               {/* Type d'incident */}
               <section className="nd-section-card">
-                <label className="nd-field-label" htmlFor="nd-type">Type d'incident</label>
+                <label className="nd-field-label" htmlFor="nd-type">Type d'incident <span style={{color: '#E2000F'}}>*</span></label>
                 <div className="nd-select-wrap">
                   <select
                     id="nd-type"
@@ -271,7 +287,7 @@ export default function NewDeclaration() {
                 <h2 className="nd-section-title">Détails de l'incident</h2>
                 <div className="nd-row-2">
                   <div className="nd-field">
-                    <label className="nd-field-label" htmlFor="nd-date">DATE DE CONSTATATION</label>
+                    <label className="nd-field-label" htmlFor="nd-date">DATE DE CONSTATATION <span style={{color: '#E2000F'}}>*</span></label>
                     <div
                       className="nd-input-wrap"
                       onClick={() => {
@@ -286,6 +302,7 @@ export default function NewDeclaration() {
                         type="date"
                         className="nd-input"
                         value={date}
+                        max={todayStr}
                         onChange={e => setDate(e.target.value)}
                         onClick={e => {
                           if (e.target.showPicker) e.target.showPicker();
@@ -295,7 +312,7 @@ export default function NewDeclaration() {
                     </div>
                   </div>
                   <div className="nd-field">
-                    <label className="nd-field-label" htmlFor="nd-time">HEURE DE CONSTATATION</label>
+                    <label className="nd-field-label" htmlFor="nd-time">HEURE DE CONSTATATION <span style={{color: '#E2000F'}}>*</span></label>
                     <div
                       className="nd-input-wrap"
                       onClick={() => {
@@ -310,7 +327,16 @@ export default function NewDeclaration() {
                         type="time"
                         className="nd-input"
                         value={time}
-                        onChange={e => setTime(e.target.value)}
+                        max={isToday ? nowStr : undefined}
+                        onChange={e => {
+                          const selected = e.target.value
+                          if (isToday && selected > nowStr) {
+                            toast.warning("L'heure ne peut pas être dans le futur.")
+                            setTime(nowStr)
+                          } else {
+                            setTime(selected)
+                          }
+                        }}
                         onClick={e => {
                           if (e.target.showPicker) e.target.showPicker();
                         }}
@@ -348,7 +374,7 @@ export default function NewDeclaration() {
                 )}
 
                 <div className="nd-field nd-field--full">
-                  <label className="nd-field-label">CODE DU SITE / LA STATION</label>
+                  <label className="nd-field-label">CODE DU SITE / LA STATION <span style={{color: '#E2000F'}}>*</span></label>
                   <AsyncSelect
                     id="nd-code"
                     cacheOptions
@@ -397,7 +423,7 @@ export default function NewDeclaration() {
                 </div>
 
                 <div className="nd-field nd-field--full">
-                  <label className="nd-field-label" htmlFor="nd-desc">DESCRIPTION DÉTAILLÉE</label>
+                  <label className="nd-field-label" htmlFor="nd-desc">DESCRIPTION DÉTAILLÉE <span style={{color: '#E2000F'}}>*</span></label>
                   <textarea
                     id="nd-desc"
                     className="nd-textarea"

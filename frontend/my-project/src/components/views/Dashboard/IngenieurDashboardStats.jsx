@@ -154,20 +154,20 @@ export default function IngenieurDashboardStats() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: '1 1 180px' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date Début</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-            style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', outline: 'none', transition: 'border-color 0.2s', background: '#F8FAFC' }}
+          <input type="date" lang="en-US" value={startDate} onChange={e => setStartDate(e.target.value)}
+            style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', outline: 'none', transition: 'border-color 0.2s', background: '#F8FAFC', fontFamily: 'inherit', color: '#1E293B' }}
             onFocus={e => e.target.style.borderColor = '#3B82F6'} onBlur={e => e.target.style.borderColor = '#CBD5E1'} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: '1 1 180px' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date Fin</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-            style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', outline: 'none', transition: 'border-color 0.2s', background: '#F8FAFC' }}
+          <input type="date" lang="en-US" value={endDate} onChange={e => setEndDate(e.target.value)}
+            style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', outline: 'none', transition: 'border-color 0.2s', background: '#F8FAFC', fontFamily: 'inherit', color: '#1E293B' }}
             onFocus={e => e.target.style.borderColor = '#3B82F6'} onBlur={e => e.target.style.borderColor = '#CBD5E1'} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: '1 1 200px' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Région / Wilaya</label>
           <input type="text" placeholder="Ex: Alger" value={wilaya} onChange={e => setWilaya(e.target.value)}
-            style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', outline: 'none', transition: 'border-color 0.2s', background: '#F8FAFC' }}
+            style={{ padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', outline: 'none', transition: 'border-color 0.2s', background: '#F8FAFC', color: '#1E293B' }}
             onFocus={e => e.target.style.borderColor = '#3B82F6'} onBlur={e => e.target.style.borderColor = '#CBD5E1'} />
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>

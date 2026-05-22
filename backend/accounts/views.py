@@ -303,4 +303,50 @@ from .serializers import CustomTokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
+    serializer_class = CustomTokenObtainPairSerializer
+
+class ForgotPasswordRequestView(APIView):
+    """
+    POST /api/accounts/forgot-password/
+    
+    Permet à un utilisateur non connecté de demander une réinitialisation
+    de son mot de passe. Crée une notification pour les administrateurs.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        identifier = request.data.get('identifier', '').strip()
+        if not identifier:
+            return Response(
+                {'error': 'Veuillez fournir un nom ou matricule.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Les administrateurs reçoivent la notification (is_staff = True)
+        admins = Utilisateur.objects.filter(is_staff=True)
+        
+        # On ajoute aussi les Directrices Assurance s'ils gèrent les comptes
+        from accounts.models import Assurance
+        directrices = Utilisateur.objects.filter(assurance__role='DIRECTRICE')
+        
+        # Union des deux QuerySets
+        admin_users = (admins | directrices).distinct()
+
+        from sinistres.models import Notification
+        notifs = []
+        message = f"Demande de réinitialisation de mot de passe reçue pour : {identifier}"
+        
+        for admin in admin_users:
+            notifs.append(Notification(
+                utilisateur=admin,
+                message=message,
+                lien_action="/settings"
+            ))
+            
+        if notifs:
+            Notification.objects.bulk_create(notifs)
+
+        return Response(
+            {'message': 'Demande envoyée avec succès.'},
+            status=status.HTTP_200_OK
+        )

@@ -184,6 +184,8 @@ export default function DossierCompleterDetail() {
   const ns = NATURE_STYLES[data.nature] || { bg: '#f0f0f0', color: '#555' }
   const declarant = data.createur_detail || {}
   const site = data.site_detail || {}
+  // Ingénieur can only edit while dossier is still in expertise phase
+  const canEdit = data.statut === 'EN_EXPERTISE'
   const gpsText = (site.latitude && site.longitude)
     ? `${site.latitude.toFixed(4)}° N, ${site.longitude.toFixed(4)}° E`
     : 'Non disponible'
@@ -212,7 +214,7 @@ export default function DossierCompleterDetail() {
               <span className="dv-eyebrow-id">#{data.idSinistre}</span>
             </div>
             <div className="dv-header-row">
-              <h1 className="dv-title">Dossier à Compléter</h1>
+              <h1 className="dv-title">Dossier</h1>
               <div className="dv-chips">
                 <ChipItem label="SITE" value={siteLabel} />
                 <ChipItem label="DATE" value={dateLabel} />
@@ -273,12 +275,7 @@ export default function DossierCompleterDetail() {
                     <span className="dv-info-label">HEURE DE SURVENANCE</span>
                     <p className="dv-info-val">{timeLabel}</p>
                   </div>
-                  <div className="dv-info-field">
-                    <span className="dv-info-label">URGENCE</span>
-                    <p className="dv-info-val" style={{ color: data.urgence === 3 ? '#E2000F' : '#64748B', fontWeight: 700 }}>
-                      {urgenceLabel}
-                    </p>
-                  </div>
+
                   <div className="dv-info-field">
                     <span className="dv-info-label">COORDONNÉES GPS</span>
                     <div className="dv-gps-val"><IconPin />{gpsText}</div>
@@ -308,9 +305,11 @@ export default function DossierCompleterDetail() {
                 <section className="dv-card dcd-equip-section">
                   <div className="dv-card-title-row dv-card-title-row--between dcd-equip-header">
                     <h2 className="dv-card-title dcd-section-title">Équipements Sinistrés</h2>
-                    <button className="dcd-add-btn" onClick={() => setShowEquipForm(!showEquipForm)}>
-                      <IconPlus /> Ajouter
-                    </button>
+                    {canEdit && (
+                      <button className="dcd-add-btn" onClick={() => setShowEquipForm(!showEquipForm)}>
+                        <IconPlus /> Ajouter
+                      </button>
+                    )}
                   </div>
 
                 {showEquipForm && (
@@ -422,9 +421,11 @@ export default function DossierCompleterDetail() {
                           {item.valeurComptable > 0 && ` • ${parseFloat(item.valeurComptable).toLocaleString('fr-FR')} DZD`}
                         </p>
                       </div>
-                      <button className="dcd-equip-remove" onClick={() => handleRemoveEquipement(item.idEquipement)} aria-label="Supprimer">
-                        <IconX />
-                      </button>
+                      {canEdit && (
+                        <button className="dcd-equip-remove" onClick={() => handleRemoveEquipement(item.idEquipement)} aria-label="Supprimer">
+                          <IconX />
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -478,8 +479,8 @@ export default function DossierCompleterDetail() {
             </div>
           </div>
 
-          {/* Bottom action - Hidden for Equipe Terrain */}
-          {user?.role !== 'EQUIPE_TERRAIN' && (
+          {/* Bottom action - only visible while dossier is in EN_EXPERTISE */}
+          {user?.role !== 'EQUIPE_TERRAIN' && canEdit && (
             <div className="dv-actions">
               <button className="dv-pdf-btn" onClick={handleCompleterDossier} disabled={submitting}
                 style={{ width: '100%', justifyContent: 'center', opacity: submitting ? 0.7 : 1 }}>
